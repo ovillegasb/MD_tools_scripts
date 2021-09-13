@@ -2,6 +2,8 @@
 # -*- conding=utf-8 -*-
 
 import argparse
+import numpy as np
+from scipy.constants import e
 
 """
   _____ _____ _____   ____  _               _____
@@ -31,17 +33,83 @@ def options():
 
     # Add the arguments
     # File
-    parser.add_argument("-f", "--file",
+    parser.add_argument("-r", "--resname",
                         help="resname from itp and gro file",
                         default="",
-                        metavar="RES",
+                        metavar="res",
                         type=str)
 
     return vars(parser.parse_args())
 
 
+class MDipolar:
+
+    def __init__(self, res):
+
+        gro = '%s.gro' % res
+        itp = '%s.itp' % res
+        file_gro = self._load_gro(gro)
+        file_itp = self._load_itp(itp)
+
+        self.name = ' '.join(next(file_gro))
+        self.nat = int(next(file_gro)[0])
+
+        coord = list()
+        for xyz in file_gro:
+            if f'1{res.upper()}' in xyz:
+                coord.append(xyz[3:6])
+
+        self.coord = np.array(coord, dtype=np.float64)
+
+        charges = list()
+        for line in file_itp:
+            if ' '.join(line) == '[ atoms ]':
+                next(file_itp)
+                break
+
+        for line in file_itp:
+            if res.upper() in line:
+                charges.append(line[6])
+            else:
+                break
+
+        self.charges = np.array(charges, dtype=np.float64)
+
+    def _load_gro(self, gro):
+        with open(gro, 'r') as GRO:
+            for line in GRO:
+                line = line.split()
+
+                yield line
+
+    def _load_itp(self, itp):
+        with open(itp, 'r') as ITP:
+            for line in ITP:
+                line = line.split()
+
+                yield line
+
+    @property
+    def mu(self):
+        q_xyz = (self.coord.T * self.charges).T * (4.8 / 1.6e-29) * e * 1e-9
+        return np.linalg.norm(q_xyz)
+
+
 def main():
-    pass
+    # starting
+    args = options()
+
+    # setting files
+    res = args['resname']
+    res = res.lower()
+
+    mu = MDipolar(res)
+
+    print('Name:', mu.name)
+    print('N atoms:', mu.nat)
+    print('Coordinates: [ x , y , z ]\n', mu.coord)
+    print('Charges: %.3f\n' % np.sum(mu.charges), mu.charges)
+    print('Moment Dipolar: %.3f' % mu.mu)
 
 
 if __name__ == '__main__':
