@@ -92,6 +92,7 @@ class MDipolar:
     @property
     def mu(self):
         q_xyz = (self.coord.T * self.charges).T * (4.8 / 1.6e-29) * e * 1e-9
+        q_xyz = np.sum(q_xyz, axis=0)
         return np.linalg.norm(q_xyz)
 
 
@@ -108,8 +109,8 @@ def main():
     print('Name:', mu.name)
     print('N atoms:', mu.nat)
     print('Coordinates: [ x , y , z ]\n', mu.coord)
-    print('Charges: %.3f\n' % np.sum(mu.charges), mu.charges)
-    print('Moment Dipolar: %.3f' % mu.mu)
+    print('Charges: %.4f\n' % np.sum(mu.charges), mu.charges)
+    print('Moment Dipolar: %.4f D' % mu.mu)
 
 
 if __name__ == '__main__':
