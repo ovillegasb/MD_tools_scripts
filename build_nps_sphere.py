@@ -49,13 +49,6 @@ class NANO:
 
         self.cell = self.load_cell(file)
 
-        # Surface in nanometers
-        self.surface = None
-        # Molecular formule
-        self.formule = None
-        # Number of H in the surface
-        self.H_surface = None
-
     def load_cell(self, file=cell_unit):
         """
         Read a file xyz.
@@ -736,9 +729,6 @@ class spherical(NANO):
         # save and convert diameter input to angstroms
         self.diameter = diameter * 10.0
 
-        # center of sphere (center of mass)
-        self.center_of_mass = 0.0
-
     def build_sphere_nps(self):
         # Steps:
 
@@ -757,11 +747,41 @@ class spherical(NANO):
         # 4 -- Adding hydrogen and oxygen atoms.
         self._surface_fill()
 
+        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
+        self._reach_surface_Q3()
+
         # 5 -- Lists of interactions are generated
         self._interactions_lists()
 
         # 6 - Assing force field parameters
         self._get_types_interactions()
+
+    @property
+    def center_of_mass(self):
+        xyz = self.sphere_final.loc[:, ['x', 'y', 'z']].values
+        return center_of_mass(xyz)
+
+    @property
+    def r_final(self):
+        """Compute radius of nanoparticles."""
+        coord = self.sphere_final[self.sphere_final.atsb == 'H']
+        c = self.center_of_mass
+        xyz = coord.loc[:, ['x', 'y', 'z']].values
+        m = cdist(xyz, np.array([c]), 'euclidean')
+
+        return np.mean(m) / 10.0
+
+    @property
+    def surface(self):
+        """area from surface."""
+        return 4 * np.pi * self.r_final**2
+
+    @property
+    def H_surface(self):
+        """Number of H per nm2"""
+        coord = self.sphere_final[self.sphere_final.atsb == 'H']
+
+        return len(coord) / self.surface
 
     def _expand_cell(self):
         """Expand the cell coordinates to cubic box with dimension
@@ -909,6 +929,69 @@ class spherical(NANO):
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
 
+    def _reach_surface_Q3(self):
+        """Check that the particle contains a surface type Q3, 4.7 H per nm."""
+        print(self.H_surface)
+
+        if self.H_surface > 5.0:
+            c = self.center_of_mass
+            # Buscar los atomos de silice mas alejados del centro
+            coord_si = self.sphere_clean[self.sphere_clean.atsb == 'Si']
+            xyz_si = coord_si.loc[:, ['x', 'y', 'z']].values
+            m = cdist(xyz_si, np.array([c]), 'euclidean')
+
+            i_si = coord_si.iloc[np.where(m == m.max())[0], 0].values[0]
+
+            # print(coord_si.iloc[np.where(m == m.max())[0][0], :])
+
+            # new = self.sphere_clean.drop()
+            print(len(self.sphere_clean))
+            print(np.where(m == m.max())[0][0])
+            print(len(m))
+            print(len(coord_si))
+            print(coord_si.iloc[np.where(m == m.max())[0][0]])
+            print(i_si)
+
+            # Formar unas nuevas sin ese atomo de oxigeno y reiniciar el bucle
+
+
+        exit()
+
+
+def center_of_mass(coords, masses=None):
+    r"""Compute the center of mass of the points at coordinates `coords` with
+    masses `masses`.
+    Args:
+        coords (np.ndarray): (N, 3) matrix of the points in :math:`\mathbb{R}^3`
+        masses (np.ndarray): vector of length N with the masses
+    Returns:
+        The center of mass as a vector in :math:`\mathbb{R}^3`
+    """
+    # check coord array
+    try:
+        coords = np.array(coords, dtype=np.float64)
+        coords = coords.reshape(coords.size // 3, 3)
+    except ValueError:
+        print("coords = ", coords)
+        raise ValueError("Cannot convert coords in a numpy array of floats"
+                         " with a shape (N, 3).")
+
+    # check masses
+    if masses is None:
+        masses = np.ones(coords.shape[0])
+    else:
+        try:
+            masses = np.array(masses, dtype=np.float64)
+            masses = masses.reshape(coords.shape[0])
+        except ValueError:
+            print("masses = ", masses)
+            raise ValueError("Cannot convert masses in a numpy array of "
+                             "floats with length coords.shape[0].")
+    if masses is None:
+        masses = np.ones(coords.shape[0])
+
+    return np.sum(coords * masses[:, np.newaxis], axis=0) / masses.sum()
+
 
 def options():
     """Generate command line interface."""
@@ -940,7 +1023,7 @@ def main():
 
     # in nanometers
     diameter = args['diameter']
-    print(f"Diameter {diameter} nm")
+    print(f"Diameter initial {diameter} nm")
 
     # initialize nanoparticle with diameter's
     nps = spherical(diameter)
@@ -953,6 +1036,11 @@ def main():
 
     # saving files
     nps.save_forcefield(nps.dfatoms, nps.box_length)
+
+    print(f"Radius final: {nps.r_final:.3f} nm")
+    print(f"Diameter final: {nps.r_final * 2:.3f} nm")
+    print(f"Surface: {nps.surface:.3f} nm2")
+    print(f"H per nm2: {nps.H_surface:.3f}")
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)
