@@ -68,13 +68,13 @@ def convert(**kwargs):
         GenMolRep('%s.smi' % resname, optim, resname, charge)
         mol = BOSSReader('%s.z' % resname, optim, charge, lbcc)
 
-    """
-
-    elif mol != None:
+    elif mol:
         os.system('cp %s /tmp/' % mol)
         os.chdir('/tmp/')
-        GenMolRep(mol, optim, resname, charge)
+        GenMolRep(mol.split('/')[-1], optim, resname, charge)
         mol = BOSSReader('%s.z' % resname, optim, charge, lbcc)
+
+    """
     elif pdb != None:
         os.system('cp %s /tmp/' % pdb)
         os.chdir('/tmp/')
