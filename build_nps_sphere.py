@@ -943,37 +943,55 @@ class spherical(NANO):
         at each iteration of which
         """
         dHO = 0.945
-
         random.seed(1)
 
         while self.H_surface > 5.0:
+            # Search si index like group OSi(OH)3
+
             coord = self.sphere_final.copy()
             connectivity = self.connectivity.copy()
             coord_si = coord[coord.atsb == 'Si']
-            i = random.choice(coord_si.index.values)
+            surface_si = []
 
-            # Search for silicon atom connectivity
-            si_connect = connectivity[i]
-            count_OH = 0
-            index_drop = []
-
-            for j in si_connect:
-                # oxygen atom connectivity
-                o_connect = connectivity[j]
-                o_links = '-'.join(coord.loc[o_connect, 'atsb'].values)
-
-                if o_links == 'Si-Si':
-                    o_si = [j, i]
-
-                elif o_links.count('H') == 1:
-                    try:
-                        o_connect.remove(i)
-                        index_drop.append(list(o_connect)[0])
+            # searchinf si near to surface
+            for i in coord_si.index:
+                count_OH = 0
+                si_connect = connectivity[i]
+                for j in si_connect:
+                    o_connect = connectivity[j]
+                    if 'H' in list(coord.loc[o_connect, 'atsb'].values):
                         count_OH += 1
-                    except KeyError:
-                        break
+                if count_OH == 3:
+                    surface_si.append(i)
+            random.shuffle(surface_si)
+            print(surface_si)
 
-            if count_OH == 3:
+            for i in surface_si:
+                # Search for silicon atom connectivity
+                si_connect = connectivity[i]
+                count_OH = 0
+                index_drop = []
+
+                for j in si_connect:
+                    # oxygen atom connectivity
+                    o_connect = connectivity[j]
+                    o_links = '-'.join(coord.loc[o_connect, 'atsb'].values)
+                    if o_links == 'Si-Si':
+                        o_si = [j, i]
+                    else:
+                        index_drop.append(j)
+
+                # searching hydrogen
+                h_drop = []
+                for o in index_drop:
+                    for h in connectivity[o]:
+                        if h != i:
+                            h_drop.append(h)
+
+                index_drop += h_drop
+
+                assert len(index_drop) == 6, "Error, six atoms must be skipped"
+
                 # Se ha seleccionada el grupo OSi(OH)3
                 new_coord = coord.drop(index=index_drop)
                 new_connectivity = connectivity.copy()
@@ -996,6 +1014,12 @@ class spherical(NANO):
                 print("New H_surface", self.H_surface)
                 if self.H_surface < 5.0:
                     break
+                print(i)
+            if self.H_surface < 5.0:
+                break
+
+            if len(surface_si) == 0:
+                break
 
 
 def center_of_mass(coords, masses=None):
