@@ -748,7 +748,13 @@ class spherical(NANO):
         self._surface_fill()
 
         # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        self._reach_surface_Q3()
+        self.save_xyz(self.sphere_final, name="test_initial")
+        if self.H_surface > 5.0:
+            self._reach_surface_Q3()
+
+        self.save_xyz(self.sphere_final, name="test_final")
+        exit()
+
 
         # 5 -- Lists of interactions are generated
         self._interactions_lists()
@@ -930,32 +936,66 @@ class spherical(NANO):
         print("Done in %.0f s" % dt)
 
     def _reach_surface_Q3(self):
-        """Check that the particle contains a surface type Q3, 4.7 H per nm."""
-        print(self.H_surface)
+        """Check that the particle contains a surface type Q3, 4.7 H per nm.
+        Surface silicon is searched for, which meet the following conditions to
+        be bonded to 3 O groups. The search is randomized over the surface si,
+        the list is extracted from the sphere_final instance, which is updated
+        at each iteration of which
+        """
+        dHO = 0.945
 
-        if self.H_surface > 5.0:
-            c = self.center_of_mass
-            # Buscar los atomos de silice mas alejados del centro
-            coord_si = self.sphere_clean[self.sphere_clean.atsb == 'Si']
-            xyz_si = coord_si.loc[:, ['x', 'y', 'z']].values
-            m = cdist(xyz_si, np.array([c]), 'euclidean')
+        random.seed(1)
 
-            i_si = coord_si.iloc[np.where(m == m.max())[0], 0].values[0]
+        while self.H_surface > 5.0:
+            coord = self.sphere_final.copy()
+            connectivity = self.connectivity.copy()
+            coord_si = coord[coord.atsb == 'Si']
+            i = random.choice(coord_si.index.values)
 
-            # print(coord_si.iloc[np.where(m == m.max())[0][0], :])
+            # Search for silicon atom connectivity
+            si_connect = connectivity[i]
+            count_OH = 0
+            index_drop = []
 
-            # new = self.sphere_clean.drop()
-            print(len(self.sphere_clean))
-            print(np.where(m == m.max())[0][0])
-            print(len(m))
-            print(len(coord_si))
-            print(coord_si.iloc[np.where(m == m.max())[0][0]])
-            print(i_si)
+            for j in si_connect:
+                # oxygen atom connectivity
+                o_connect = connectivity[j]
+                o_links = '-'.join(coord.loc[o_connect, 'atsb'].values)
 
-            # Formar unas nuevas sin ese atomo de oxigeno y reiniciar el bucle
+                if o_links == 'Si-Si':
+                    o_si = [j, i]
 
+                elif o_links.count('H') == 1:
+                    try:
+                        o_connect.remove(i)
+                        index_drop.append(list(o_connect)[0])
+                        count_OH += 1
+                    except KeyError:
+                        break
 
-        exit()
+            if count_OH == 3:
+                # Se ha seleccionada el grupo OSi(OH)3
+                new_coord = coord.drop(index=index_drop)
+                new_connectivity = connectivity.copy()
+                for at in index_drop:
+                    new_connectivity.pop(at)
+                # compute the vector o--si
+                vo = coord.loc[o_si[0], ['x', 'y', 'z']].values
+                vsi = coord.loc[o_si[1], ['x', 'y', 'z']].values
+                u_osi = (vsi - vo) / np.linalg.norm(vsi - vo)
+                xyz_h = dHO * u_osi + vo
+                # Adding in new coord
+                new_coord.loc[o_si[1], 'atsb'] = 'H'
+                new_coord.loc[o_si[1], 'x'] = xyz_h[0]
+                new_coord.loc[o_si[1], 'y'] = xyz_h[1]
+                new_coord.loc[o_si[1], 'z'] = xyz_h[2]
+                new_coord.loc[o_si[1], 'nb'] = 1
+                # saving in the class
+                self.sphere_final = new_coord.copy()
+                self.connectivity = new_connectivity.copy()
+                print("New H_surface", self.H_surface)
+                if self.H_surface < 5.0:
+                    break
 
 
 def center_of_mass(coords, masses=None):
