@@ -78,7 +78,10 @@ class connectivity(nx.DiGraph):
         # remove atoms not conected
         for i in coord.index:
             # print(i, list(self.neighbors(i)), int(self.degree[i] / 2))
-            if int(self.degree[i] / 2) == 0:
+            if self.nbonds(i) == 0:
+                self.remove_node(i)
+
+            elif self.nodes[i]['atsb'] == 'Si' and self.nbonds(i) == 1:
                 self.remove_node(i)
 
     def nbonds(self, iat):
