@@ -232,7 +232,6 @@ class NANO:
     def _get_angles_list(self, connect):
         """Returns a list oof angles."""
         angles_list = set()
-        # map(lambda in0, in1: (in0, in1), indexs[0], indexs[1])
         for at in connect.nodes:
             at_links = list(connect.neighbors(at))
             if len(at_links) == 2:
@@ -243,13 +242,9 @@ class NANO:
 
         return angles_list
 
-    def get_pairs_list(self, bonds, angles):
-        """
-        Return a list of pair (1-4)
-
-        """
+    def _get_pairs_list(self, bonds, angles):
+        """Return a list of pair (1-4)."""
         pairs_list = set()
-
         for ia, ja, ka in angles:
             for ib, jb in bonds:
                 if ia == ib and ja != jb:
@@ -283,38 +278,32 @@ class NANO:
         return pairs_list
 
     def _set_atoms_types(self, coord, connect, bonds, angles):
-        """
-        Assing atoms type to atoms
-
-        """
+        """Assing atoms type to atoms."""
         coord['type'] = 'no found'
-
         for i in coord.index:
             # For H
             if coord.loc[i, 'atsb'] == 'H':
                 coord.loc[i, 'type'] = 'Hsurf'
-
             # For Si
             if coord.loc[i, 'atsb'] == 'Si':
                 coord.loc[i, 'type'] = 'SIbulk'
-
             # For O bulk and surf
             if coord.loc[i, 'atsb'] == 'O':
                 n_Si = 0
                 n_H = 0
-                for j in connect[i]:
+                for j in connect.neighbors(i):
                     if coord.loc[j, 'atsb'] == 'Si':
                         n_Si += 1
                     if coord.loc[j, 'atsb'] == 'H':
                         n_H += 1
-
                 if n_Si == 2:
                     coord.loc[i, 'type'] = 'Obulk'
                 elif n_Si == 1 and n_H == 1:
                     coord.loc[i, 'type'] = 'Osurf'
 
-        if 'no found' in coord['type']:
+        if 'no found' in coord['type'].values:
             print(coord[coord.type == 'no found'])
+            print(coord)
             exit()
 
         # bonds types
@@ -322,7 +311,6 @@ class NANO:
         bonds_types = list()
         for ai, aj in bonds_list:
             bonds_types.append((coord.loc[ai, "type"], coord.loc[aj, "type"]))
-
         dfbonds = pd.DataFrame({
             "list": bonds_list, "type": bonds_types})
 
@@ -342,18 +330,20 @@ class NANO:
 
     def save_forcefield(self, coord, box, res='NPS'):
         # Testing if Si and H its ok
-        sicoord = coord[(coord['atsb'] == 'Si') & (coord['nb'] < 4)]
-        ocoord = coord[(coord['atsb'] == 'O') & (coord['nb'] < 2)]
+        # sicoord = coord[(coord['atsb'] == 'Si') & (coord['nb'] < 4)]
+        # ocoord = coord[(coord['atsb'] == 'O') & (coord['nb'] < 2)]
 
-        if len(sicoord) != 0 or len(ocoord) != 0:
-            print('ERROR atoms')
-            print(f'silice {sicoord}')
-            print(f'oxygens {ocoord}')
-            print('gro and itp not saved')
+        # if len(sicoord) != 0 or len(ocoord) != 0:
+        #     print('ERROR atoms')
+        #     print(f'silice {sicoord}')
+        #     print(f'oxygens {ocoord}')
+        #     print('gro and itp not saved')
 
-        else:
-            self.write_gro(coord, box, res)
-            self.write_itp(res)
+        # else:
+        #     self.write_gro(coord, box, res)
+        #     self.write_itp(res)
+        self.write_gro(coord, box, res)
+        self.write_itp(res)
 
     def write_gro(self, coord, box, res='NPS'):
         """

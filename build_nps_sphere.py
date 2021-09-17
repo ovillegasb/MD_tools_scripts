@@ -53,10 +53,12 @@ def build_sphere_nps(diameter, file=cell_unit):
     connect.add_hydrogen()
     sphere_final = connect.save_df()
     # nano.save_xyz(sphere_final, name="sphere_final")
+    # sphere_final.reset_index(inplace=True)
+    # sphere_final.rename(columns={'index': 'index0'}, inplace=True)
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
 
-    return sphere_final, connect
+    return sphere_final, connect, box_length
 
 
 def _expand_cell(diameter, cell):
@@ -137,8 +139,6 @@ def _surface_clean(coord):
     connect.get_connectivity(coord)
     # Updates number of bonds for dfatoms.
     new_coord = coord.loc[list(connect.nodes()), :]
-    new_coord['index0'] = new_coord.index
-    new_coord['nb'] = new_coord.apply(lambda x: connect.nbonds(x['index0']), axis=1)
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
     return new_coord, connect
@@ -160,10 +160,9 @@ class spherical(nano.NANO):
         # save and convert diameter input to angstroms
         self.diameter = diameter * 10.0
         # Gen dataframe estructure with coordinates and connectivity
-        self.sphere, self.connectivity = build_sphere_nps(diameter, file)
-
-        # Charge interaction lists
-        self._interactions_lists()
+        self.sphere, self.connectivity, self.box_length = build_sphere_nps(
+            diameter, file
+        )
 
     @property
     def center_of_mass(self):
@@ -191,11 +190,11 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
         return len(coord) / self.surface
 
-    def _interactions_lists(self):
+    def interactions_lists(self):
         """Lists of interactions are generated."""
+        connect = self.connectivity
         # bonds
         print("Bonds list", end=" -- ")
-        connect = self.connectivity
         t0 = time.time()
         self.bonds_list = self._get_bonds_list(connect)
         dt = time.time() - t0
@@ -203,27 +202,28 @@ class spherical(nano.NANO):
         # angles
         print("Angles list", end=" -- ")
         t0 = time.time()
-        self.angles_list = self.get_angles_list(connect)
+        self.angles_list = self._get_angles_list(connect)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
-        exit()
         # pairs 1-4
         print("Pairs list", end=" -- ")
         t0 = time.time()
-        self.pairs_list = self.get_pairs_list(
-            self.bonds_list, self.angles_list)
+        self.pairs_list = self._get_pairs_list(self.bonds_list, self.angles_list)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
+        # search interactions types
+        self._get_types_interactions()
 
     def _get_types_interactions(self):
         """ Searching atoms, bonds angles types."""
-
         print("assigning force field parameters", end=" -- ")
         t0 = time.time()
-
         self.dfatoms, self.dfbonds, self.dfangles = self._set_atoms_types(
-            self.sphere_final, self.connectivity, self.bonds_list, self.angles_list)
-
+            self.sphere,
+            self.connectivity,
+            self.bonds_list,
+            self.angles_list
+        )
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
 
@@ -553,19 +553,16 @@ def main():
     # The spherical class is initialized from the structure of the generated nanoparticle.
     nps = spherical(diameter)
 
-    # Construct a sphere from the indicated diameter.
-    # nps.build_sphere_nps()
-
-    # save xyz
-    # nps.save_xyz(nps.sphere_init, name="sphere_init")
+    # Gen interaction lists
+    nps.interactions_lists()
 
     # saving files
-    # nps.save_forcefield(nps.dfatoms, nps.box_length)
+    nps.save_forcefield(nps.sphere, nps.box_length)
 
-    # print(f"Radius final: {nps.r_final:.3f} nm")
-    # print(f"Diameter final: {nps.r_final * 2:.3f} nm")
-    # print(f"Surface: {nps.surface:.3f} nm2")
-    # print(f"H per nm2: {nps.H_surface:.3f}")
+    print(f"Radius final: {nps.r_final:.3f} nm")
+    print(f"Diameter final: {nps.r_final * 2:.3f} nm")
+    print(f"Surface: {nps.surface:.3f} nm2")
+    print(f"H per nm2: {nps.H_surface:.3f}")
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)
