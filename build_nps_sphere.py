@@ -16,20 +16,21 @@ import numpy as np
 from numpy import random
 import itertools as it
 from scipy.spatial.distance import cdist
-from nanomaterial import NANO
+import nanomaterial as nano
 
 # dat location
 location = os.path.dirname(os.path.realpath(__file__))
 cell_unit = os.path.join(location, "cell_unit_crystalobalite.xyz")
 
 
-class spherical(NANO):
-    """
-    Class to represent a specifically spherical nanoparticle
+def build_sphere(diameter, file=cell_unit):
+    cell = nano.load_xyz(file)
 
-    """
 
-    def __init__(self, diameter, file=cell_unit):
+class spherical(nano.NANO):
+    """Class to represent a specifically spherical nanoparticle."""
+
+    def __init__(self, diameter, file):
         """
         Initialize building a box cubic from a unit cell, then the cell will be
         cut to a sphere. For default is the unit cell of the crystallobalyte.
@@ -65,10 +66,10 @@ class spherical(NANO):
         # self.save_xyz(self.sphere_final, 'sphere_final')
 
         # 5 -- Lists of interactions are generated
-        self._interactions_lists()
+        # self._interactions_lists()
 
         # 6 - Assing force field parameters
-        self._get_types_interactions()
+        # self._get_types_interactions()
 
     @property
     def center_of_mass(self):
@@ -567,22 +568,25 @@ def main():
     diameter = args['diameter']
     print(f"Diameter initial {diameter} nm")
 
-    # initialize nanoparticle with diameter's
-    nps = spherical(diameter)
+    # Build a sphere for diameter desire
+    build_sphere(diameter)
 
-    # build sphere
-    nps.build_sphere_nps()
+    # The spherical class is initialized from the structure of the generated nanoparticle.
+    # nps = spherical(diameter)
+
+    # Construct a sphere from the indicated diameter.
+    # nps.build_sphere_nps()
 
     # save xyz
     # nps.save_xyz(nps.sphere_init, name="sphere_init")
 
     # saving files
-    nps.save_forcefield(nps.dfatoms, nps.box_length)
+    # nps.save_forcefield(nps.dfatoms, nps.box_length)
 
-    print(f"Radius final: {nps.r_final:.3f} nm")
-    print(f"Diameter final: {nps.r_final * 2:.3f} nm")
-    print(f"Surface: {nps.surface:.3f} nm2")
-    print(f"H per nm2: {nps.H_surface:.3f}")
+    # print(f"Radius final: {nps.r_final:.3f} nm")
+    # print(f"Diameter final: {nps.r_final * 2:.3f} nm")
+    # print(f"Surface: {nps.surface:.3f} nm2")
+    # print(f"H per nm2: {nps.H_surface:.3f}")
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)

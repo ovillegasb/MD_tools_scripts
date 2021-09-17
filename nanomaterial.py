@@ -12,41 +12,39 @@ from scipy.spatial.distance import cdist
 from silica_forcefield import data_atomstype, data_bondstype, data_anglestype
 
 
+"""
+Cell Parameter
+
+crystalobalite:
+    A: 4.97170 angs   alpha: 90.0 degree
+    B: 4.97170 angs   beta: 90.0 degree
+    C: 6.92230 angs   gamma: 90.0 degree
+"""
+
+par = {'A': 4.97170, 'B': 4.97170, 'C': 6.92230}
+
+
+def load_xyz(file):
+    """Read a file xyz."""
+    coord = pd.read_csv(
+        file,
+        sep=r'\s+',
+        skiprows=2,
+        header=None,
+        names=['atsb', 'x', 'y', 'z'],
+        dtype={'x': np.float64, 'y': np.float64, 'z': np.float64}
+    )
+
+    return coord
+
+
 class NANO:
-    """
-    Object nanoparticle
-
-    """
-
-    """
-    Cell Parameter
-
-    crystalobalite:
-        A: 4.97170 angs   alpha: 90.0 degree
-        B: 4.97170 angs   beta: 90.0 degree
-        C: 6.92230 angs   gamma: 90.0 degree
-    """
-
-    par = {'A': 4.97170, 'B': 4.97170, 'C': 6.92230}
+    """ Object nanoparticle """
 
     def __init__(self, file):
         """The NANO object is initialized by loading a reference structure."""
 
         self.cell = self.load_xyz(file)
-
-    def load_xyz(self, file):
-        """Read a file xyz."""
-
-        coord = pd.read_csv(
-            file,
-            sep=r'\s+',
-            skiprows=2,
-            header=None,
-            names=['atsb', 'x', 'y', 'z'],
-            dtype={'x': np.float64, 'y': np.float64, 'z': np.float64}
-        )
-
-        return coord
 
     def _neighboring_pairs(self, coord):
         """Return neighboring pairs"""
