@@ -229,15 +229,22 @@ class NANO:
 
         return bonds_list
 
-    def get_angles_list(self, connect, bonds):
-        """
-        Returns a list oof angles.
-
-        """
+    def get_angles_list(self, connect):
+        """Returns a list oof angles."""
         angles_list = set()
-
         at_bonds = dict()
+        print(connect)
+        for at in connect.nodes:
+            at_links = list(connect.neighbors(at))
+            if len(at_links) == 2:
+                angles_list.add((at_links[0], at, at_links[1]))
+            elif len(at_links) == 3:
+                print(at_links)
 
+        print(angles_list)
+            # print(connect.neighbors)
+            # at_bonds[at] = set()
+        exit()
         for at in connect:
             at_bonds[at] = set()
             for bds in bonds:

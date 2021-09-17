@@ -199,15 +199,14 @@ class spherical(nano.NANO):
         self.bonds_list = self._get_bonds_list(connect)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
-        exit()
 
         print("Angles list", end=" -- ")
         t0 = time.time()
         # angles and pairs 1-4
-        self.angles_list = self.get_angles_list(
-            self.connectivity, self.bonds_list)
+        self.angles_list = self.get_angles_list(connect)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
+        exit()
 
         print("Pairs list", end=" -- ")
         t0 = time.time()
