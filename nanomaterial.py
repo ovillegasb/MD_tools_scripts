@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 from numpy import random
 import itertools as it
+import networkx as nx
 from scipy.spatial.distance import cdist
 from silica_forcefield import data_atomstype, data_bondstype, data_anglestype
 
@@ -51,7 +52,44 @@ def save_xyz(coord, name='nps'):
     # writing all
     with open(xyz, "w") as f:
         f.write(lines)
-    print(f'Name of xyz file: {xyz}')
+    print(f'Saved xyz file: {xyz}')
+
+
+class connectivity(nx.DiGraph):
+    def __init__(self):
+        super().__init__()
+
+    def get_connectivity(self, coord):
+        """Build connectivity from Graph."""
+        # Add nodes using atom and coordinates
+        for i in coord.index:
+            self.add_node(
+                i,
+                xyz=coord.loc[i, ['x', 'y', 'z']].values,
+                atsb=coord.loc[i, 'atsb']
+            )
+
+        # get pairs atoms bonded
+        pairs = _neighboring_pairs(coord)
+        for i, j in pairs:
+            self.add_edge(i, j)
+            self.add_edge(j, i)
+
+        # remove atoms not conected
+        for i in coord.index:
+            # print(i, list(self.neighbors(i)), int(self.degree[i] / 2))
+            if int(self.degree[i] / 2) == 0:
+                self.remove_node(i)
+
+
+def _neighboring_pairs(coord):
+    """Return neighboring pairs"""
+    xyz = coord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
+    # compute distance
+    m = cdist(xyz, xyz, 'euclidean')
+    m = np.triu(m)
+    indexs = np.where((m > 0.) & (m <= 2.0))
+    return map(lambda in0, in1: (in0, in1), indexs[0], indexs[1])
 
 
 class NANO:
@@ -61,37 +99,6 @@ class NANO:
         """The NANO object is initialized by loading a reference structure."""
 
         self.cell = self.load_xyz(file)
-
-    def _neighboring_pairs(self, coord):
-        """Return neighboring pairs"""
-        xyz = coord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
-        # compute distance
-        m = cdist(xyz, xyz, 'euclidean')
-        m = np.triu(m)
-
-        indexs = np.where((m > 0.) & (m <= 2.0))
-
-        return map(lambda in0, in1: (in0, in1), indexs[0], indexs[1])
-
-    def get_connectivity(self, coord):
-        """ Return connectivity of the system no periodic"""
-        connect = dict()
-        pairs = self._neighboring_pairs(coord)
-
-        for i, j in pairs:
-            if i in connect:
-                connect[i].add(j)
-            else:
-                connect[i] = set()
-                connect[i].add(j)
-
-            if j in connect:
-                connect[j].add(i)
-            else:
-                connect[j] = set()
-                connect[j].add(i)
-
-        return connect
 
     def _atoms_not_connected(self, coord, connect):
         # search atoms not connected

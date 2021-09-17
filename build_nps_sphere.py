@@ -41,7 +41,7 @@ def build_sphere_nps(diameter, file=cell_unit):
     nano.save_xyz(sphere_init, name="sphere_init")
 
     # 3 -- Complete the surface on sphere initial.
-    # self._surface_clean()
+    _surface_clean(sphere_init)
 
     # 4 -- Adding hydrogen and oxygen atoms.
     # self._surface_fill()
@@ -116,6 +116,23 @@ def _cut_sphere(diameter, box_init, box_length):
     return sphere
 
 
+def _surface_clean(sphere_init):
+    """The surface of the nanoparticle is completed with O, H."""
+    print("Clean surface and search connectivity", end=" -- ")
+    t0 = time.time()
+    # search connectivity
+    connect = nano.connectivity()
+    connect.get_connectivity(sphere_init)
+    # update number of bonds for atom
+    ##sphere = self._update_nbonds(sphere, connect)
+    # self.save_xyz(sphere, 'sphere')
+    ##self.sphere_clean = sphere.copy()
+    ##self.connectivity = connect
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
+    ##self.save_xyz(self.sphere_clean, name="sphere_clean")
+
+
 class spherical(nano.NANO):
     """Class to represent a specifically spherical nanoparticle."""
 
@@ -173,30 +190,6 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
         return len(coord) / self.surface
-
-    def _surface_clean(self):
-        """The surface of the nanoparticle is completed with O, H."""
-        print("Clean surface and search connectivity", end=" -- ")
-        t0 = time.time()
-
-        # search connectivity
-        connect = self.get_connectivity(self.sphere_init)
-
-        # removing no connected atoms
-        sphere = self._atoms_not_connected(self.sphere_init, connect)
-        # search connectivity again
-        connect = self.get_connectivity(sphere)
-
-        # update number of bonds for atom
-        sphere = self._update_nbonds(sphere, connect)
-        # self.save_xyz(sphere, 'sphere')
-
-        self.sphere_clean = sphere.copy()
-        self.connectivity = connect
-
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.sphere_clean, name="sphere_clean")
 
     def _surface_fill(self):
         """It adds hydrogen and oxygen to the surface."""
