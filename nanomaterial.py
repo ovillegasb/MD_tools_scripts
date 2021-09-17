@@ -38,6 +38,22 @@ def load_xyz(file):
     return coord
 
 
+def save_xyz(coord, name='nps'):
+    """Saves an xyz file of coordinates."""
+    nat = len(coord)
+    xyz = "%s.xyz" % name
+    lines = ''
+    lines += '%d\n' % nat
+    lines += '%s\n' % name
+    for i in coord.index:
+        line = (coord.atsb[i], coord.x[i], coord.y[i], coord.z[i])
+        lines += '%3s%8.3f%8.3f%8.3f\n' % line
+    # writing all
+    with open(xyz, "w") as f:
+        f.write(lines)
+    print(f'Name of xyz file: {xyz}')
+
+
 class NANO:
     """ Object nanoparticle """
 
@@ -99,25 +115,6 @@ class NANO:
             coord.loc[i, 'nb'] = len(connect[i])
 
         return coord
-
-    def save_xyz(self, coord, name='nps'):
-        """Saves an xyz file of coordinates."""
-
-        nat = len(coord)
-        xyz = "%s.xyz" % name
-
-        lines = ''
-        lines += '%d\n' % nat
-        lines += '%s\n' % name
-        for i in coord.index:
-            line = (coord.atsb[i], coord.x[i], coord.y[i], coord.z[i])
-            lines += '%3s%8.3f%8.3f%8.3f\n' % line
-
-        # writing all
-        with open(xyz, "w") as f:
-            f.write(lines)
-
-        print(f'Name of xyz file: {xyz}')
 
     def _add_oxygens(self, coord, connect):
         """Adding news oxygens to silice with nb < 4"""

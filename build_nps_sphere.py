@@ -23,8 +23,67 @@ location = os.path.dirname(os.path.realpath(__file__))
 cell_unit = os.path.join(location, "cell_unit_crystalobalite.xyz")
 
 
-def build_sphere(diameter, file=cell_unit):
+def build_sphere_nps(diameter, file=cell_unit):
+    # Steps:
+
+    # 0 -- Init read unit cell
     cell = nano.load_xyz(file)
+
+    # 1 -- Expand unit cell to cubic box in (diameter + 1 nm)^3
+    box_init, box_length = _expand_cell(diameter, cell)
+    nano.save_xyz(box_init, name="box_init")
+
+    # 2 -- cut sphere in a sphere from the center of box.
+    # self._cut_sphere()
+
+    # 3 -- Complete the surface on sphere initial.
+    # self._surface_clean()
+
+    # 4 -- Adding hydrogen and oxygen atoms.
+    # self._surface_fill()
+
+
+def _expand_cell(diameter, cell):
+    """Expand the cell coordinates to cubic box with dimension
+    (diameter + 2.5 angs)^3."""
+
+    print('Expand box', end=' -- ')
+    t0 = time.time()
+    d = diameter + 2.5
+    # extract parameter from unit cell
+    # n A
+    nA = int(round(d / nano.par['A']))
+    A = nano.par['A']
+    # n B
+    nB = int(round(d / nano.par['B']))
+    B = nano.par['B']
+    # n C
+    nC = int(round(d / nano.par['C']))
+    C = nano.par['C']
+
+    box = np.array([nA * A, nB * B, nC * C])
+
+    coord = pd.DataFrame({
+        'atsb': [],
+        'x': [],
+        'y': [],
+        'z': []
+    })
+
+    for (a, b, c) in it.product(range(nA), range(nB), range(nC)):
+        # copy from cell
+        test_coord = pd.DataFrame(cell, copy=True)
+        # modify coordinates
+        traslation = np.array([a, b, c]) * np.array([A, B, C])
+        test_coord.loc[:, ['x', 'y', 'z']] += traslation
+        # add to the system
+        coord = coord.append(test_coord, ignore_index=True)
+    box_init = coord.copy()
+    box_length = box
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
+
+    return box_init, box_length
 
 
 class spherical(nano.NANO):
@@ -45,20 +104,6 @@ class spherical(nano.NANO):
         self.diameter = diameter * 10.0
 
     def build_sphere_nps(self):
-        # Steps:
-
-        # 0 -- Init read unit cell
-        # 1 -- Expand unit cell to cubic box in (diameter + 1 nm)^3
-        self._expand_cell()
-
-        # 2 -- cut sphere in a sphere from the center of box.
-        self._cut_sphere()
-
-        # 3 -- Complete the surface on sphere initial.
-        self._surface_clean()
-
-        # 4 -- Adding hydrogen and oxygen atoms.
-        self._surface_fill()
 
         # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
         # if self.H_surface > 5.0:
@@ -97,51 +142,6 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
         return len(coord) / self.surface
-
-    def _expand_cell(self):
-        """Expand the cell coordinates to cubic box with dimension
-        (diameter + 2.5 angs)^3."""
-        print('Expand box', end=' -- ')
-        t0 = time.time()
-        d = self.diameter + 2.5
-        cell = self.cell
-        # extract parameter from unit cell
-        # n A
-        nA = int(round(d / self.par['A']))
-        A = self.par['A']
-        # n B
-        nB = int(round(d / self.par['B']))
-        B = self.par['B']
-
-        # n C
-        nC = int(round(d / self.par['C']))
-        C = self.par['C']
-
-        box = np.array([nA * A, nB * B, nC * C])
-
-        coord = pd.DataFrame({
-            'atsb': [],
-            'x': [],
-            'y': [],
-            'z': []
-        })
-
-        for (a, b, c) in it.product(range(nA), range(nB), range(nC)):
-            # copy from cell
-            test_coord = pd.DataFrame(cell, copy=True)
-
-            # modify coordinates
-            traslation = np.array([a, b, c]) * np.array([A, B, C])
-            test_coord.loc[:, ['x', 'y', 'z']] += traslation
-
-            # add to the system
-            coord = coord.append(test_coord, ignore_index=True)
-
-        self.box_init = coord.copy()
-        self.box_length = box
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.box_init, name="box_init")
 
     def _cut_sphere(self):
         """Cut a sphere of defined diameter centered in the center of the case."""
