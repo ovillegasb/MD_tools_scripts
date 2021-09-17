@@ -26,6 +26,9 @@ cell_unit = os.path.join(location, "cell_unit_crystalobalite.xyz")
 def build_sphere_nps(diameter, file=cell_unit):
     # Steps:
 
+    # changing diameter to angstroms
+    diameter = diameter * 10.0
+
     # 0 -- Init read unit cell
     cell = nano.load_xyz(file)
 
@@ -46,9 +49,9 @@ def build_sphere_nps(diameter, file=cell_unit):
 def _expand_cell(diameter, cell):
     """Expand the cell coordinates to cubic box with dimension
     (diameter + 2.5 angs)^3."""
-
     print('Expand box', end=' -- ')
     t0 = time.time()
+    # exapnd to 2.5 angstroms
     d = diameter + 2.5
     # extract parameter from unit cell
     # n A
@@ -78,12 +81,11 @@ def _expand_cell(diameter, cell):
         test_coord.loc[:, ['x', 'y', 'z']] += traslation
         # add to the system
         coord = coord.append(test_coord, ignore_index=True)
-    box_init = coord.copy()
-    box_length = box
+
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
 
-    return box_init, box_length
+    return coord, box
 
 
 class spherical(nano.NANO):
@@ -115,6 +117,7 @@ class spherical(nano.NANO):
 
         # 6 - Assing force field parameters
         # self._get_types_interactions()
+        pass
 
     @property
     def center_of_mass(self):
@@ -569,7 +572,7 @@ def main():
     print(f"Diameter initial {diameter} nm")
 
     # Build a sphere for diameter desire
-    build_sphere(diameter)
+    build_sphere_nps(diameter)
 
     # The spherical class is initialized from the structure of the generated nanoparticle.
     # nps = spherical(diameter)
