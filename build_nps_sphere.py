@@ -193,21 +193,21 @@ class spherical(nano.NANO):
 
     def _interactions_lists(self):
         """Lists of interactions are generated."""
+        # bonds
         print("Bonds list", end=" -- ")
         connect = self.connectivity
         t0 = time.time()
         self.bonds_list = self._get_bonds_list(connect)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
-
+        # angles
         print("Angles list", end=" -- ")
         t0 = time.time()
-        # angles and pairs 1-4
         self.angles_list = self.get_angles_list(connect)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
         exit()
-
+        # pairs 1-4
         print("Pairs list", end=" -- ")
         t0 = time.time()
         self.pairs_list = self.get_pairs_list(
