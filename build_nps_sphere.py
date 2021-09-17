@@ -24,6 +24,8 @@ cell_unit = os.path.join(location, "cell_unit_crystalobalite.xyz")
 
 
 def build_sphere_nps(diameter, file=cell_unit):
+    """Here is the core of the construction of the nanoparticle."""
+
     # Steps:
 
     # changing diameter to angstroms
@@ -50,9 +52,11 @@ def build_sphere_nps(diameter, file=cell_unit):
     connect.add_oxygens()
     connect.add_hydrogen()
     sphere_final = connect.save_df()
-    nano.save_xyz(sphere_final, name="sphere_final")
+    # nano.save_xyz(sphere_final, name="sphere_final")
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
+
+    return sphere_final, connect
 
 
 def _expand_cell(diameter, cell):
@@ -140,21 +144,10 @@ def _surface_clean(coord):
     return new_coord, connect
 
 
-def _surface_fill(coord, connect):
-    """It adds hydrogen and oxygen to the surface."""
-    print("Adding hydrogen and oxygen atoms", end=" -- ")
-    t0 = time.time()
-    sphere, connect = _add_oxygens(coord, connect)
-    sphere, connect = _add_hydrogen(coord, connect)
-    dt = time.time() - t0
-    print("Done in %.0f s" % dt)
-    return new_coord, new_connect
-
-
 class spherical(nano.NANO):
     """Class to represent a specifically spherical nanoparticle."""
 
-    def __init__(self, diameter, file):
+    def __init__(self, diameter, file=cell_unit):
         """
         Initialize building a box cubic from a unit cell, then the cell will be
         cut to a sphere. For default is the unit cell of the crystallobalyte.
@@ -162,35 +155,25 @@ class spherical(nano.NANO):
         diameter -- diameter for nanoparticle in nanometers.
 
         """
-
-        super().__init__(file)
+        super().__init__()
 
         # save and convert diameter input to angstroms
         self.diameter = diameter * 10.0
+        # Gen dataframe estructure with coordinates and connectivity
+        self.sphere, self.connectivity = build_sphere_nps(diameter, file)
 
-    def build_sphere_nps(self):
-
-        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        # if self.H_surface > 5.0:
-        #     self._reach_surface_Q3()
-        # self.save_xyz(self.sphere_final, 'sphere_final')
-
-        # 5 -- Lists of interactions are generated
-        # self._interactions_lists()
-
-        # 6 - Assing force field parameters
-        # self._get_types_interactions()
-        pass
+        # Charge interaction lists
+        self._interactions_lists()
 
     @property
     def center_of_mass(self):
-        xyz = self.sphere_final.loc[:, ['x', 'y', 'z']].values
+        xyz = self.sphere.loc[:, ['x', 'y', 'z']].values
         return center_of_mass(xyz)
 
     @property
     def r_final(self):
         """Compute radius of nanoparticles."""
-        coord = self.sphere_final[self.sphere_final.atsb == 'H']
+        coord = self.sphere[self.sphere.atsb == 'H']
         c = self.center_of_mass
         xyz = coord.loc[:, ['x', 'y', 'z']].values
         m = cdist(xyz, np.array([c]), 'euclidean')
@@ -206,7 +189,6 @@ class spherical(nano.NANO):
     def H_surface(self):
         """Number of H per nm2"""
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
-
         return len(coord) / self.surface
 
     def _interactions_lists(self):
@@ -217,6 +199,7 @@ class spherical(nano.NANO):
         self.bonds_list = self._get_bonds_list(connect)
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
+        exit()
 
         print("Angles list", end=" -- ")
         t0 = time.time()
@@ -567,10 +550,9 @@ def main():
     print(f"Diameter initial {diameter} nm")
 
     # Build a sphere for diameter desire
-    build_sphere_nps(diameter)
 
     # The spherical class is initialized from the structure of the generated nanoparticle.
-    # nps = spherical(diameter)
+    nps = spherical(diameter)
 
     # Construct a sphere from the indicated diameter.
     # nps.build_sphere_nps()
