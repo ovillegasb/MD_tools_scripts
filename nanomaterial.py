@@ -58,6 +58,8 @@ def save_xyz(coord, name='nps'):
 class connectivity(nx.DiGraph):
     def __init__(self):
         super().__init__()
+        self._open_si = []
+        self._open_o = []
 
     def get_connectivity(self, coord):
         """Build connectivity from Graph."""
@@ -77,16 +79,128 @@ class connectivity(nx.DiGraph):
 
         # remove atoms not conected
         for i in coord.index:
-            # print(i, list(self.neighbors(i)), int(self.degree[i] / 2))
+            # remove any atom not bonded
             if self.nbonds(i) == 0:
                 self.remove_node(i)
 
             elif self.nodes[i]['atsb'] == 'Si' and self.nbonds(i) == 1:
+                self._open_o.append(list(self.neighbors(i))[0])
                 self.remove_node(i)
+
+            elif self.nodes[i]['atsb'] == 'Si' and 1 < self.nbonds(i) < 4:
+                self._open_si.append(i)
+
+            elif self.nodes[i]['atsb'] == 'O' and self.nbonds(i) == 1:
+                self._open_o.append(i)
 
     def nbonds(self, iat):
         """Return number of atoms in connected to iat."""
         return int(self.degree[iat] / 2)
+
+    def add_oxygens(self):
+        """Adding news oxygens to silice with 1 < nb < 4."""
+        natoms = max(list(self.nodes)) + 1
+        for ai in self._open_si:
+            # Silicon coordinates
+            si = np.array(self.nodes[ai]['xyz'], dtype=np.float64)
+            if self.nbonds(ai) == 3:
+                # One bond is required.
+                oxygens = list(self.neighbors(ai))
+                ox1 = np.array(self.nodes[oxygens[0]]['xyz'], dtype=np.float64)
+                ox2 = np.array(self.nodes[oxygens[1]]['xyz'], dtype=np.float64)
+                ox3 = np.array(self.nodes[oxygens[2]]['xyz'], dtype=np.float64)
+                new_ox = (si - ox1) + (si - ox2) + (si - ox3) + si
+                # adding new molecule
+                self._add_new_at(natoms, ai, new_ox, 'O')
+                self._open_o.append(natoms)
+                natoms += 1
+
+            if self.nbonds(ai) == 2:
+                # Two bonds are required.
+                oxygens = list(self.neighbors(ai))
+                ox1 = np.array(self.nodes[oxygens[0]]['xyz'], dtype=np.float64)
+                ox2 = np.array(self.nodes[oxygens[1]]['xyz'], dtype=np.float64)
+                # Calculing new coordinates for two O
+                M = (ox1 + ox2) / 2
+                N = 2 * si - M
+                MA = ox1 - M
+                MP = si - M
+                # MA x MP
+                vnew = np.cross(MA, MP)
+                new_ox1 = N + vnew / np.linalg.norm(MP)
+                new_ox2 = N - vnew / np.linalg.norm(MP)
+                # adding new molecule
+                self._add_new_at(natoms, ai, new_ox1, 'O')
+                self._open_o.append(natoms)
+                natoms += 1
+                self._add_new_at(natoms, ai, new_ox2, 'O')
+                self._open_o.append(natoms)
+                natoms += 1
+
+    def add_hydrogen(self):
+        """Adding hydrogen to terminal oxygens."""
+        natoms = max(list(self.nodes)) + 1
+        dHO = 0.945  # angs
+        thHOSi = 115.0  # degree
+        for ai in self._open_o:
+            # Silicon coordinates
+            ox = np.array(self.nodes[ai]['xyz'], dtype=np.float64)
+            # Silicon connected
+            si = np.array(self.nodes[list(self.neighbors(ai))[0]]['xyz'], dtype=np.float64)
+            # compute the coordinate hydrogen randomly
+            osi_vec = si - ox
+            osi_u = osi_vec / np.linalg.norm(osi_vec)
+            # ramdom insertion of H
+            th = 0.0
+            while not np.isclose(thHOSi, th, atol=1):
+                phi = random.uniform(0, 2 * np.pi, 1)[0]
+                theta = 0.0
+                # Find the sign of the z-axis
+                if osi_vec[2] > 0:
+                    theta += random.uniform(0, np.pi / 2, 1)[0]
+                else:
+                    theta += random.uniform(np.pi / 2, np.pi, 1)[0]
+                dx = dHO * np.cos(phi) * np.sin(theta)
+                dy = dHO * np.sin(phi) * np.sin(theta)
+                dz = dHO * np.cos(theta)
+                oh_vec = np.array([dx, dy, dz])
+                oh_u = oh_vec / np.linalg.norm(oh_vec)
+                h = oh_vec + ox
+                th_hosi = np.arccos(np.dot(oh_u, osi_u))
+                th_hosi *= 180 / np.pi
+                th = np.round(th_hosi, decimals=1)
+
+            self._add_new_at(natoms, ai, h, 'H')
+            natoms += 1
+
+    def _add_new_at(self, n, m, vector, symbol):
+        """Add news atoms in the structure."""
+        self.add_node(
+            n,
+            xyz=vector,
+            atsb=symbol
+        )
+        # adding connectivity
+        self.add_edge(n, m)
+        self.add_edge(m, n)
+
+    def save_df(self):
+        """Return the connectivity as a Pandas DataFrame."""
+        indexs = list(self.nodes)
+        rows = list()
+
+        for i in self.nodes:
+            rows.append({
+                'atsb': self.nodes[i]['atsb'],
+                'x': self.nodes[i]['xyz'][0],
+                'y': self.nodes[i]['xyz'][1],
+                'z': self.nodes[i]['xyz'][2]
+            })
+
+        df = pd.DataFrame(
+            rows, index=indexs
+        )
+        return df
 
 
 def _neighboring_pairs(coord):

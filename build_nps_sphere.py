@@ -42,10 +42,17 @@ def build_sphere_nps(diameter, file=cell_unit):
 
     # 3 -- Complete the surface on sphere initial.
     sphere_clean, connect = _surface_clean(sphere_init)
-    nano.save_xyz(sphere_clean, name="sphere_clean")
+    # nano.save_xyz(sphere_clean, name="sphere_clean")
 
     # 4 -- Adding hydrogen and oxygen atoms.
-    # self._surface_fill()
+    print("Adding hydrogen and oxygen atoms", end=" -- ")
+    t0 = time.time()
+    connect.add_oxygens()
+    connect.add_hydrogen()
+    sphere_final = connect.save_df()
+    nano.save_xyz(sphere_final, name="sphere_final")
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
 
 
 def _expand_cell(diameter, cell):
@@ -133,6 +140,17 @@ def _surface_clean(coord):
     return new_coord, connect
 
 
+def _surface_fill(coord, connect):
+    """It adds hydrogen and oxygen to the surface."""
+    print("Adding hydrogen and oxygen atoms", end=" -- ")
+    t0 = time.time()
+    sphere, connect = _add_oxygens(coord, connect)
+    sphere, connect = _add_hydrogen(coord, connect)
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
+    return new_coord, new_connect
+
+
 class spherical(nano.NANO):
     """Class to represent a specifically spherical nanoparticle."""
 
@@ -190,22 +208,6 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
         return len(coord) / self.surface
-
-    def _surface_fill(self):
-        """It adds hydrogen and oxygen to the surface."""
-        print("Adding hydrogen and oxygen atoms", end=" -- ")
-        t0 = time.time()
-        sphere, connect = self._add_oxygens(self.sphere_clean, self.connectivity)
-        sphere, connect = self._add_hydrogen(sphere, connect)
-        # self.save_xyz(sphere, 'sphere_H')
-
-        # search connectivity
-        self.sphere_final = sphere.copy()
-        self.connectivity.update(connect)
-
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.sphere_final, name="sphere_final")
 
     def _interactions_lists(self):
         """Lists of interactions are generated."""
