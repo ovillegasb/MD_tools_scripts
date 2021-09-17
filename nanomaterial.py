@@ -595,6 +595,10 @@ class NANO:
         lines += "; RES: {}\n".format(res)
         lines += "; Formule: {}\n".format(formule)
         lines += "; Total Charge %.1f\n" % sum([data_atomstype[coord.loc[ch, 'type']][0] for ch in coord.index])
+        lines += f"Radius final: {self.r_final:.3f} nm"
+        lines += f"Diameter final: {self.r_final * 2:.3f} nm"
+        lines += f"Surface: {self.surface:.3f} nm2"
+        lines += f"H per nm2: {self.H_surface:.3f}"
 
         # atoms types
         lines += "\n[ atomtypes ]\n"
