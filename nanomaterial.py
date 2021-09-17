@@ -81,6 +81,10 @@ class connectivity(nx.DiGraph):
             if int(self.degree[i] / 2) == 0:
                 self.remove_node(i)
 
+    def nbonds(self, iat):
+        """Return number of atoms in connected to iat."""
+        return int(self.degree[iat] / 2)
+
 
 def _neighboring_pairs(coord):
     """Return neighboring pairs"""

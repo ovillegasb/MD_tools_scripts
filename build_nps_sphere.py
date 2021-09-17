@@ -38,10 +38,11 @@ def build_sphere_nps(diameter, file=cell_unit):
 
     # 2 -- cut sphere in a sphere from the center of box.
     sphere_init = _cut_sphere(diameter, box_init, box_length)
-    nano.save_xyz(sphere_init, name="sphere_init")
+    # nano.save_xyz(sphere_init, name="sphere_init")
 
     # 3 -- Complete the surface on sphere initial.
-    _surface_clean(sphere_init)
+    sphere_clean, connect = _surface_clean(sphere_init)
+    nano.save_xyz(sphere_clean, name="sphere_clean")
 
     # 4 -- Adding hydrogen and oxygen atoms.
     # self._surface_fill()
@@ -116,21 +117,20 @@ def _cut_sphere(diameter, box_init, box_length):
     return sphere
 
 
-def _surface_clean(sphere_init):
+def _surface_clean(coord):
     """The surface of the nanoparticle is completed with O, H."""
     print("Clean surface and search connectivity", end=" -- ")
     t0 = time.time()
     # search connectivity
     connect = nano.connectivity()
-    connect.get_connectivity(sphere_init)
-    # update number of bonds for atom
-    ##sphere = self._update_nbonds(sphere, connect)
-    # self.save_xyz(sphere, 'sphere')
-    ##self.sphere_clean = sphere.copy()
-    ##self.connectivity = connect
+    connect.get_connectivity(coord)
+    # Updates number of bonds for dfatoms.
+    new_coord = coord.loc[list(connect.nodes()), :]
+    new_coord['index0'] = new_coord.index
+    new_coord['nb'] = new_coord.apply(lambda x: connect.nbonds(x['index0']), axis=1)
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
-    ##self.save_xyz(self.sphere_clean, name="sphere_clean")
+    return new_coord, connect
 
 
 class spherical(nano.NANO):
