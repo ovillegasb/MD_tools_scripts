@@ -139,9 +139,13 @@ def _surface_clean(coord):
     connect.get_connectivity(coord)
     # Updates number of bonds for dfatoms.
     new_coord = coord.loc[list(connect.nodes()), :]
+    new_coord.reset_index(drop=True, inplace=True)
+    # updating index
+    new_connect = nano.connectivity()
+    new_connect.get_connectivity(new_coord)
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
-    return new_coord, connect
+    return new_coord, new_connect
 
 
 class spherical(nano.NANO):
