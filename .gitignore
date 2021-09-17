@@ -107,3 +107,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# Some coordinates files
+*.xyz
+*.gro
+*.itp
