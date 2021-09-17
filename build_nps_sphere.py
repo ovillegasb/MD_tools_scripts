@@ -34,10 +34,11 @@ def build_sphere_nps(diameter, file=cell_unit):
 
     # 1 -- Expand unit cell to cubic box in (diameter + 1 nm)^3
     box_init, box_length = _expand_cell(diameter, cell)
-    nano.save_xyz(box_init, name="box_init")
+    # nano.save_xyz(box_init, name="box_init")
 
     # 2 -- cut sphere in a sphere from the center of box.
-    # self._cut_sphere()
+    sphere_init = _cut_sphere(diameter, box_init, box_length)
+    nano.save_xyz(sphere_init, name="sphere_init")
 
     # 3 -- Complete the surface on sphere initial.
     # self._surface_clean()
@@ -86,6 +87,33 @@ def _expand_cell(diameter, cell):
     print("Done in %.0f s" % dt)
 
     return coord, box
+
+
+def _cut_sphere(diameter, box_init, box_length):
+    """Cut a sphere of defined diameter centered in the center of the case."""
+    print('Cut sphere', end=' -- ')
+    t0 = time.time()
+    coord = box_init.copy()
+    sphere = pd.DataFrame({
+        'atsb': [],
+        'x': [],
+        'y': [],
+        'z': []
+    })
+    # center of box
+    center = box_length / 2
+    # sphere radio
+    r = (diameter + 1) / 2
+    # searching atoms in sphere
+    for i in coord.index:
+        vec = coord.loc[i, ['x', 'y', 'z']].values.astype(np.float64)
+        r_vec = np.linalg.norm(vec - center)
+        if r_vec < r:
+            sphere = sphere.append(coord.loc[i, :], ignore_index=True)
+
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
+    return sphere
 
 
 class spherical(nano.NANO):
@@ -145,34 +173,6 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
         return len(coord) / self.surface
-
-    def _cut_sphere(self):
-        """Cut a sphere of defined diameter centered in the center of the case."""
-        print('Cut sphere', end=' -- ')
-        t0 = time.time()
-        coord = self.box_init.copy()
-        sphere = pd.DataFrame({
-            'atsb': [],
-            'x': [],
-            'y': [],
-            'z': []
-        })
-        # center of box
-        center = self.box_length / 2
-        # sphere radio
-        r = (self.diameter + 1) / 2
-        # searching atoms in sphere
-        for i in coord.index:
-            vec = coord.loc[i, ['x', 'y', 'z']].values.astype(np.float64)
-            r_vec = np.linalg.norm(vec - center)
-
-            if r_vec < r:
-                sphere = sphere.append(coord.loc[i, :], ignore_index=True)
-
-        self.sphere_init = sphere.copy()
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.sphere_init, name="sphere_init")
 
     def _surface_clean(self):
         """The surface of the nanoparticle is completed with O, H."""
