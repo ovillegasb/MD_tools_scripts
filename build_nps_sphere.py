@@ -191,7 +191,7 @@ class spherical(nano.NANO):
     @property
     def H_surface(self):
         """Number of H per nm2"""
-        coord = self.sphere_final[self.sphere_final.atsb == 'H']
+        coord = self.sphere[self.sphere.atsb == 'H']
         return len(coord) / self.surface
 
     def interactions_lists(self):
