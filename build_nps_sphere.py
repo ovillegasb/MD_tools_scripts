@@ -42,10 +42,9 @@ def build_sphere_nps(diameter, file=cell_unit):
     # 0 -- Init read unit cell
     cell = nano.load_xyz(file)
 
-    nano.save_xyz(cell, 'cell_test0')
-
     # 1 -- Expand unit cell to cubic box in (diameter + 1 nm)^3
-    # self._expand_cell()
+    box_init, box_length = _expand_cell(diameter, cell)
+    nano.save_xyz(box_init, name="box_init")
 
     # 2 -- cut sphere in a sphere from the center of box.
     # self._cut_sphere()
@@ -73,6 +72,48 @@ def build_sphere_nps(diameter, file=cell_unit):
 
     # 6 - Assing force field parameters
     #self._get_types_interactions()
+
+
+def _expand_cell(diameter, cell):
+    """Expand the cell coordinates to cubic box with dimension
+    (diameter + 2.5 angs)^3."""
+
+    print('Expand box', end=' -- ')
+    t0 = time.time()
+    d = diameter + 2.5
+    # extract parameter from unit cell
+    # n A
+    nA = int(round(d / nano.par['A']))
+    A = nano.par['A']
+    # n B
+    nB = int(round(d / nano.par['B']))
+    B = nano.par['B']
+    # n C
+    nC = int(round(d / nano.par['C']))
+    C = nano.par['C']
+    # Box length (3x1)
+    box = np.array([nA * A, nB * B, nC * C])
+    # DataFrame (4xn) [ atom symbol, x, y, z ]
+    coord = pd.DataFrame({
+        'atsb': [],
+        'x': [],
+        'y': [],
+        'z': []
+    })
+    # Expand box
+    for (a, b, c) in it.product(range(nA), range(nB), range(nC)):
+        # copy from cell
+        test_coord = pd.DataFrame(cell, copy=True)
+        # modify coordinates
+        traslation = np.array([a, b, c]) * np.array([A, B, C])
+        test_coord.loc[:, ['x', 'y', 'z']] += traslation
+        # add to the system
+        coord = coord.append(test_coord, ignore_index=True)
+
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
+
+    return coord, box
 
 
 class spherical(nano.NANO):
@@ -145,51 +186,6 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
         return len(coord) / self.surface2
-
-    def _expand_cell(self):
-        """Expand the cell coordinates to cubic box with dimension
-        (diameter + 2.5 angs)^3."""
-        print('Expand box', end=' -- ')
-        t0 = time.time()
-        d = self.diameter + 2.5
-        cell = self.cell
-        # extract parameter from unit cell
-        # n A
-        nA = int(round(d / self.par['A']))
-        A = self.par['A']
-        # n B
-        nB = int(round(d / self.par['B']))
-        B = self.par['B']
-
-        # n C
-        nC = int(round(d / self.par['C']))
-        C = self.par['C']
-
-        box = np.array([nA * A, nB * B, nC * C])
-
-        coord = pd.DataFrame({
-            'atsb': [],
-            'x': [],
-            'y': [],
-            'z': []
-        })
-
-        for (a, b, c) in it.product(range(nA), range(nB), range(nC)):
-            # copy from cell
-            test_coord = pd.DataFrame(cell, copy=True)
-
-            # modify coordinates
-            traslation = np.array([a, b, c]) * np.array([A, B, C])
-            test_coord.loc[:, ['x', 'y', 'z']] += traslation
-
-            # add to the system
-            coord = coord.append(test_coord, ignore_index=True)
-
-        self.box_init = coord.copy()
-        self.box_length = box
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.box_init, name="box_init")
 
     def _cut_sphere(self):
         """Cut a sphere of defined diameter centered in the center of the case."""
