@@ -288,7 +288,7 @@ class spherical(NANO):
             # print(coord[coord.count_OH > 2])
 
             #random.shuffle(surface_si[3])
-            #random.shuffle(surface_si[2])
+            random.shuffle(surface_si[2])
             print(surface_si)
             # print(coord.loc[surface_si[3], :])
             # print(coord.loc[surface_si[2], :])
@@ -321,8 +321,8 @@ class spherical(NANO):
                         print(self.sphere_final.loc[index_drop, :])
                         break
 
-                    print(index_drop)
-                    print(coord.loc[index_drop, :])
+                    # print(index_drop)
+                    # print(coord.loc[index_drop, :])
 
                     # The OSi(OH)3 group has been selected.
                     new_coord = self.sphere_final.drop(index=index_drop)
@@ -355,8 +355,7 @@ class spherical(NANO):
                     # print(i)
                     break
 
-            """
-            if len(surface_si[3]) == 0 and len(surface_si[2]) > 0:
+            elif len(surface_si[3]) == 0 and len(surface_si[2]) > 0:
                 for i in surface_si[2]:
                     # Search for silicon atom connectivity
                     si_connect = self.connectivity[i]
@@ -377,8 +376,7 @@ class spherical(NANO):
                             news_oxygen_free.append(j)
                         else:
                             index_drop.append(j)
-                        # print(o_links)
-                    # exit()
+
                     # searching hydrogen
                     h_drop = []
                     for o in index_drop:
@@ -490,10 +488,7 @@ class spherical(NANO):
                     # saving in the class
                     self.sphere_final = new_coord.copy()
                     self.connectivity = new_connectivity.copy()
-                    print("New H_surface", self.H_surface)
-                    print("N atoms total", len(self.sphere_final))
-                    print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
-                    print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
+
                     if self.H_surface < 5.0:
                         break
                     if self.r_final * 2 < self.diameter / 10:
@@ -501,8 +496,6 @@ class spherical(NANO):
                         break
                     # print(i)
                     break
-            """
-            nit += 1
 
             print('Hola, in while again')
             print("New H_surface", self.H_surface)
@@ -510,15 +503,17 @@ class spherical(NANO):
             print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
             print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
             print("Iteration number", nit)
-            if nit == 10:
-                exit()
-
-            if self.r_final * 2 < self.diameter / 10:
-                print(" La estructura alcanzo el limite para mantener el tamano deseado")
+            nit += 1
+            if nit > 200:
                 break
+
+            # if self.r_final * 2 < round(self.diameter, 0) / 10:
+            #     print(" La estructura alcanzo el limite para mantener el tamano deseado")
+            #     break
 
             # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
             if len(surface_si[3]) == 0:
+                # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
                 break
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
