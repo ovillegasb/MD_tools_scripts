@@ -17,6 +17,9 @@ from numpy import random
 import itertools as it
 from scipy.spatial.distance import cdist
 from nanomaterial import NANO
+import matplotlib.pyplot as plt
+import matplotlib.tri as mtri
+from scipy.spatial import Delaunay
 
 # dat location
 location = os.path.dirname(os.path.realpath(__file__))
@@ -59,10 +62,16 @@ class spherical(NANO):
         # 4 -- Adding hydrogen and oxygen atoms.
         self._surface_fill()
 
+        print(self.H_surface)
+        Hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
+        # self.save_xyz(Hcoord, 'Only_Hatoms')
+        show_mesh_nps(Hcoord)
+        exit()
+
         # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        if self.H_surface > 5.0:
-            self._reach_surface_Q3()
-        self.save_xyz(self.sphere_final, 'sphere_final')
+        #if self.H_surface > 5.0:
+        #    self._reach_surface_Q3()
+        #self.save_xyz(self.sphere_final, 'sphere_final')
 
         # 5 -- Lists of interactions are generated
         #self._interactions_lists()
@@ -552,6 +561,66 @@ def center_of_mass(coords, masses=None):
         masses = np.ones(coords.shape[0])
 
     return np.sum(coords * masses[:, np.newaxis], axis=0) / masses.sum()
+
+
+def show_mesh_nps(coords):
+
+    xyz = coords.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
+    tri = Delaunay(xyz)
+    # print(tri)
+
+    def collect_edges(tri):
+        edges = set()
+
+        def sorted_tuple(a, b):
+            return (a, b) if a < b else (b, a)
+
+        # Add edges of tetrahedron (sorted so we don't add an edge twice, even if it comes in reverse order).
+        for (i0, i1, i2, i3) in tri.simplices:
+            edges.add(sorted_tuple(i0, i1))
+            edges.add(sorted_tuple(i0, i2))
+            edges.add(sorted_tuple(i0, i3))
+            edges.add(sorted_tuple(i1, i2))
+            edges.add(sorted_tuple(i1, i3))
+            edges.add(sorted_tuple(i2, i3))
+        return edges
+
+    def plot_tri_2(ax, points, tri):
+        edges = collect_edges(tri)
+        x = np.array([])
+        y = np.array([])
+        z = np.array([])
+        for (i, j) in edges:
+            x = np.append(x, [points[i, 0], points[j, 0], np.nan])      
+            y = np.append(y, [points[i, 1], points[j, 1], np.nan])      
+            z = np.append(z, [points[i, 2], points[j, 2], np.nan])
+        ax.plot3D(x, y, z, color='g', lw='0.1')
+
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+
+    plot_tri_2(ax, xyz, tri)
+
+    # for tr in tri.simplices:
+    #     pts = xyz[tr, :]
+    #     ax.plot3D(pts[[0, 1], 0], pts[[0, 1], 1], pts[[0, 1], 2], color='g', lw='0.1')
+    #     ax.plot3D(pts[[0, 2], 0], pts[[0, 2], 1], pts[[0, 2], 2], color='g', lw='0.1')
+    #     ax.plot3D(pts[[0, 3], 0], pts[[0, 3], 1], pts[[0, 3], 2], color='g', lw='0.1')
+    #     ax.plot3D(pts[[1, 2], 0], pts[[1, 2], 1], pts[[1, 2], 2], color='g', lw='0.1')
+    #     ax.plot3D(pts[[1, 3], 0], pts[[1, 3], 1], pts[[1, 3], 2], color='g', lw='0.1')
+    #     ax.plot3D(pts[[2, 3], 0], pts[[2, 3], 1], pts[[2, 3], 2], color='g', lw='0.1')
+
+    ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], color='b')
+
+    ax.set_xlim3d(0, xyz[:, 0].max())
+    ax.set_ylim3d(0, xyz[:, 1].max())
+    ax.set_zlim3d(0, xyz[:, 2].max())
+
+    plt.show()
+
+
+
+
 
 
 def options():
