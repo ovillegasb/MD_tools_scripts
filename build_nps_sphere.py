@@ -60,15 +60,15 @@ class spherical(NANO):
         self._surface_fill()
 
         # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        # if self.H_surface > 5.0:
-        #     self._reach_surface_Q3()
-        # self.save_xyz(self.sphere_final, 'sphere_final')
+        if self.H_surface > 5.0:
+            self._reach_surface_Q3()
+        self.save_xyz(self.sphere_final, 'sphere_final')
 
         # 5 -- Lists of interactions are generated
-        self._interactions_lists()
+        #self._interactions_lists()
 
         # 6 - Assing force field parameters
-        self._get_types_interactions()
+        #self._get_types_interactions()
 
     @property
     def center_of_mass(self):
@@ -208,7 +208,7 @@ class spherical(NANO):
 
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
-        self.save_xyz(self.sphere_final, name="sphere_final")
+        self.save_xyz(self.sphere_final, name="sphere_fill")
 
     def _interactions_lists(self):
         """Lists of interactions are generated."""
@@ -259,32 +259,36 @@ class spherical(NANO):
         thHOSi = 115.0
         random.seed(1)
         natoms_init = len(self.sphere_final)
+        nit = 0
 
         while self.H_surface > 5.0:
-            # coord = self.sphere_final.copy()
-            # connectivity = self.connectivity.copy()
-            coord_si = self.sphere_final[self.sphere_final.atsb == 'Si']
+            coord = self.sphere_final.copy()
+            connectivity = self.connectivity.copy()
+            coord_si = coord[coord.atsb == 'Si']
             surface_si = {3: [], 2: []}
-            self.sphere_final['count_OH'] = 0
+            coord['count_OH'] = 0
 
             # searchinf si near to surface
             for i in coord_si.index:
                 count_OH = 0
-                si_connect = self.connectivity[i]
+                si_connect = connectivity[i]
                 for j in si_connect:
-                    o_connect = self.connectivity[j]
-                    if 'H' in list(self.sphere_final.loc[o_connect, 'atsb'].values):
+                    o_connect = connectivity[j]
+                    if 'H' in list(coord.loc[o_connect, 'atsb'].values):
                         count_OH += 1
                 if count_OH == 3:
                     surface_si[3].append(i)
-                    self.sphere_final.loc[i, 'count_OH'] = 3
+                    coord.loc[i, 'count_OH'] = 3
 
                 elif count_OH == 2:
                     surface_si[2].append(i)
-                    self.sphere_final.loc[i, 'count_OH'] = 2
+                    coord.loc[i, 'count_OH'] = 2
 
-            random.shuffle(surface_si[3])
-            random.shuffle(surface_si[2])
+            # Dataframe with actual count OH groups for SI
+            # print(coord[coord.count_OH > 2])
+
+            #random.shuffle(surface_si[3])
+            #random.shuffle(surface_si[2])
             print(surface_si)
             # print(coord.loc[surface_si[3], :])
             # print(coord.loc[surface_si[2], :])
@@ -310,7 +314,16 @@ class spherical(NANO):
                             if h != i:
                                 h_drop.append(h)
                     index_drop += h_drop
-                    assert len(index_drop) == 6, "Error, six atoms must be skipped"
+                    # assert len(index_drop) == 6, "Error, six atoms must be skipped"
+                    if len(index_drop) != 6:
+                        print("Error, six atoms must be skipped")
+                        print(f"{len(index_drop)} was selected")
+                        print(self.sphere_final.loc[index_drop, :])
+                        break
+
+                    print(index_drop)
+                    print(coord.loc[index_drop, :])
+
                     # The OSi(OH)3 group has been selected.
                     new_coord = self.sphere_final.drop(index=index_drop)
                     new_connectivity = self.connectivity.copy()
@@ -328,19 +341,20 @@ class spherical(NANO):
                     new_coord.loc[o_si[1], 'z'] = xyz_h[2]
                     new_coord.loc[o_si[1], 'nb'] = 1
                     # saving in the class
+                    # new_coord.reset_index(drop=True, inplace=True)
+                    # new_coord.index += 1
+                    # Updating Coordinates and Connectivuty
                     self.sphere_final = new_coord.copy()
+                    # self.connectivity = self.get_connectivity(self.sphere_final)
                     self.connectivity = new_connectivity.copy()
-                    print("New H_surface", self.H_surface)
-                    print("N atoms total", len(self.sphere_final))
-                    print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
-                    print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
                     if self.H_surface < 5.0:
                         break
                     if self.r_final * 2 < self.diameter / 10:
                         print(" Limite alcanzado, aumente el tamano")
                         break
                     # print(i)
-                    continue
+                    break
+
             """
             if len(surface_si[3]) == 0 and len(surface_si[2]) > 0:
                 for i in surface_si[2]:
@@ -488,12 +502,22 @@ class spherical(NANO):
                     # print(i)
                     break
             """
+            nit += 1
+
+            print('Hola, in while again')
+            print("New H_surface", self.H_surface)
+            print("N atoms total", len(self.sphere_final))
+            print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
+            print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
+            print("Iteration number", nit)
+            if nit == 10:
+                exit()
 
             if self.r_final * 2 < self.diameter / 10:
                 print(" La estructura alcanzo el limite para mantener el tamano deseado")
                 break
 
-            #if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
+            # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
             if len(surface_si[3]) == 0:
                 break
         dt = time.time() - t0
@@ -577,7 +601,7 @@ def main():
     # nps.save_xyz(nps.sphere_init, name="sphere_init")
 
     # saving files
-    nps.save_forcefield(nps.dfatoms, nps.box_length)
+    # nps.save_forcefield(nps.dfatoms, nps.box_length)
 
     print(f"Radius final: {nps.r_final:.3f} nm")
     print(f"Diameter final: {nps.r_final * 2:.3f} nm")
