@@ -20,6 +20,11 @@ from nanomaterial import NANO
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
+from scipy.spatial import ConvexHull
+import mpl_toolkits.mplot3d as a3
+import matplotlib as mpl
+import scipy as sp
+
 
 # dat location
 location = os.path.dirname(os.path.realpath(__file__))
@@ -46,6 +51,8 @@ class spherical(NANO):
         # save and convert diameter input to angstroms
         self.diameter = diameter * 10.0
 
+        self.faces = None
+
     def build_sphere_nps(self):
         # Steps:
 
@@ -63,15 +70,16 @@ class spherical(NANO):
         self._surface_fill()
 
         print(self.H_surface)
-        Hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
+        print(self.surface)
+        # Hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
         # self.save_xyz(Hcoord, 'Only_Hatoms')
-        show_mesh_nps(Hcoord)
-        exit()
+        # show_surface_nps(Hcoord)
+        # exit()
 
         # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        #if self.H_surface > 5.0:
-        #    self._reach_surface_Q3()
-        #self.save_xyz(self.sphere_final, 'sphere_final')
+        if self.H_surface > 5.0:
+            self._reach_surface_Q3()
+        self.save_xyz(self.sphere_final, 'sphere_final')
 
         # 5 -- Lists of interactions are generated
         #self._interactions_lists()
@@ -100,11 +108,28 @@ class spherical(NANO):
         return 4 * np.pi * self.r_final**2
 
     @property
+    def surface2(self):
+        """Surface area from ConvexHull"""
+        hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
+        xyz = hcoord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
+
+        hull = ConvexHull(xyz)
+        indexs = hull.simplices
+        self.faces = xyz[indexs]
+
+        # print('area:', hull.area)
+        # print('volume:', hull.volume)
+
+        # return in nanometers^2
+
+        return hull.area / 100
+
+    @property
     def H_surface(self):
         """Number of H per nm2"""
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
-        return len(coord) / self.surface
+        return len(coord) / self.surface2
 
     def _expand_cell(self):
         """Expand the cell coordinates to cubic box with dimension
@@ -277,6 +302,8 @@ class spherical(NANO):
             surface_si = {3: [], 2: []}
             coord['count_OH'] = 0
 
+            is_added = False
+
             # searchinf si near to surface
             for i in coord_si.index:
                 count_OH = 0
@@ -356,6 +383,7 @@ class spherical(NANO):
                     self.sphere_final = new_coord.copy()
                     # self.connectivity = self.get_connectivity(self.sphere_final)
                     self.connectivity = new_connectivity.copy()
+                    is_added = True
                     if self.H_surface < 5.0:
                         break
                     if self.r_final * 2 < self.diameter / 10:
@@ -365,6 +393,7 @@ class spherical(NANO):
                     break
 
             elif len(surface_si[3]) == 0 and len(surface_si[2]) > 0:
+                n_at_test = len(surface_si[2])
                 for i in surface_si[2]:
                     # Search for silicon atom connectivity
                     si_connect = self.connectivity[i]
@@ -494,26 +523,49 @@ class spherical(NANO):
                     new_connectivity[news_oxygen_free[1]].add(natoms)
                     new_connectivity[natoms] = set()
                     new_connectivity[natoms].add(news_oxygen_free[1])
-                    # saving in the class
-                    self.sphere_final = new_coord.copy()
-                    self.connectivity = new_connectivity.copy()
 
-                    if self.H_surface < 5.0:
-                        break
-                    if self.r_final * 2 < self.diameter / 10:
-                        print(" Limite alcanzado, aumente el tamano")
-                        break
+                    """Surface area from ConvexHull"""
+                    hcoord = new_coord[new_coord.atsb == 'H']
+                    xyz = hcoord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
+                    hull = ConvexHull(xyz)
+
+                    h_surface_test = len(hcoord) / hull.area / 100
+
+                    if h_surface_test < self.H_surface:
+                        # saving in the class
+                        print('test', h_surface_test, 'back', self.H_surface)
+                        self.sphere_final = new_coord.copy()
+                        self.connectivity = new_connectivity.copy()
+                        is_added = True
+
+                        if self.H_surface < 5.0:
+                            break
+
+                        if self.r_final * 2 < self.diameter / 10:
+                            print(" Limite alcanzado, aumente el tamano")
+                            break
+
+                    else:
+                        print(f'{i} dont added')
+                        exit()
+                        n_at_test -= 1
+                        if n_at_test == 0:
+                            break
+                        else:
+                            continue
                     # print(i)
                     break
 
-            print('Hola, in while again')
-            print("New H_surface", self.H_surface)
-            print("N atoms total", len(self.sphere_final))
-            print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
-            print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
-            print("Iteration number", nit)
-            nit += 1
-            if nit > 200:
+            if is_added:
+                print('Hola, in while again')
+                print("New H_surface", self.H_surface)
+                print("N atoms total", len(self.sphere_final))
+                print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
+                print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
+                print("Iteration number", nit)
+                nit += 1
+
+            if nit > 300:
                 break
 
             # if self.r_final * 2 < round(self.diameter, 0) / 10:
@@ -521,8 +573,8 @@ class spherical(NANO):
             #     break
 
             # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
-            if len(surface_si[3]) == 0:
-                # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
+            # if len(surface_si[3]) == 0:
+            if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
                 break
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
@@ -619,8 +671,25 @@ def show_mesh_nps(coords):
     plt.show()
 
 
+def show_surface_nps(faces, d):
 
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
 
+    # ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], color='b')
+
+    ax.set_xlim3d(0, d * 10)
+    ax.set_ylim3d(0, d * 10)
+    ax.set_zlim3d(0, d * 10)
+
+    for f in faces:
+        face = a3.art3d.Poly3DCollection([f])
+        face.set_color(mpl.colors.rgb2hex(random.rand(3)))
+        face.set_edgecolor('k')
+        face.set_alpha(0.5)
+        ax.add_collection3d(face)
+
+    plt.show()
 
 
 def options():
@@ -671,6 +740,8 @@ def main():
     print(f"Diameter final: {nps.r_final * 2:.3f} nm")
     print(f"Surface: {nps.surface:.3f} nm2")
     print(f"H per nm2: {nps.H_surface:.3f}")
+
+    show_surface_nps(nps.faces, diameter)
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)
