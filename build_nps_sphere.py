@@ -16,14 +16,12 @@ import numpy as np
 from numpy import random
 import itertools as it
 from scipy.spatial.distance import cdist
-from nanomaterial import NANO
+import nanomaterial as nano
 import matplotlib.pyplot as plt
-import matplotlib.tri as mtri
 from scipy.spatial import Delaunay
 from scipy.spatial import ConvexHull
 import mpl_toolkits.mplot3d as a3
 import matplotlib as mpl
-import scipy as sp
 
 
 # dat location
@@ -31,7 +29,53 @@ location = os.path.dirname(os.path.realpath(__file__))
 cell_unit = os.path.join(location, "cell_unit_crystalobalite.xyz")
 
 
-class spherical(NANO):
+def build_sphere_nps(diameter, file=cell_unit):
+    """
+    Here is the core of the construction of the nanoparticle.
+
+    diameter -- diameter for work in angstroms
+
+    """
+
+    # Steps:
+
+    # 0 -- Init read unit cell
+    cell = nano.load_xyz(file)
+
+    nano.save_xyz(cell, 'cell_test0')
+
+    # 1 -- Expand unit cell to cubic box in (diameter + 1 nm)^3
+    # self._expand_cell()
+
+    # 2 -- cut sphere in a sphere from the center of box.
+    # self._cut_sphere()
+
+    # 3 -- Complete the surface on sphere initial.
+    # self._surface_clean()
+
+    # 4 -- Adding hydrogen and oxygen atoms.
+    # self._surface_fill()
+
+    # print(self.H_surface)
+    # print(self.surface)
+    # Hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
+    # self.save_xyz(Hcoord, 'Only_Hatoms')
+    # show_surface_nps(Hcoord)
+    # exit()
+
+    # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
+    # if self.H_surface > 5.0:
+    #     self._reach_surface_Q3()
+    # self.save_xyz(self.sphere_final, 'sphere_final')
+
+    # 5 -- Lists of interactions are generated
+    #self._interactions_lists()
+
+    # 6 - Assing force field parameters
+    #self._get_types_interactions()
+
+
+class spherical(nano.NANO):
     """
     Class to represent a specifically spherical nanoparticle
 
@@ -48,44 +92,15 @@ class spherical(NANO):
 
         super().__init__(file)
 
-        # save and convert diameter input to angstroms
+        # changing diameter to angstroms
         self.diameter = diameter * 10.0
 
+        # Gen dataframe estructure with coordinates and connectivity
+        build_sphere_nps(self.diameter, file)
+
+
+        # Initialize face from surface
         self.faces = None
-
-    def build_sphere_nps(self):
-        # Steps:
-
-        # 0 -- Init read unit cell
-        # 1 -- Expand unit cell to cubic box in (diameter + 1 nm)^3
-        self._expand_cell()
-
-        # 2 -- cut sphere in a sphere from the center of box.
-        self._cut_sphere()
-
-        # 3 -- Complete the surface on sphere initial.
-        self._surface_clean()
-
-        # 4 -- Adding hydrogen and oxygen atoms.
-        self._surface_fill()
-
-        print(self.H_surface)
-        print(self.surface)
-        # Hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
-        # self.save_xyz(Hcoord, 'Only_Hatoms')
-        # show_surface_nps(Hcoord)
-        # exit()
-
-        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        if self.H_surface > 5.0:
-            self._reach_surface_Q3()
-        self.save_xyz(self.sphere_final, 'sphere_final')
-
-        # 5 -- Lists of interactions are generated
-        #self._interactions_lists()
-
-        # 6 - Assing force field parameters
-        #self._get_types_interactions()
 
     @property
     def center_of_mass(self):
@@ -728,7 +743,7 @@ def main():
     nps = spherical(diameter)
 
     # build sphere
-    nps.build_sphere_nps()
+    #nps.build_sphere_nps()
 
     # save xyz
     # nps.save_xyz(nps.sphere_init, name="sphere_init")
@@ -736,12 +751,12 @@ def main():
     # saving files
     # nps.save_forcefield(nps.dfatoms, nps.box_length)
 
-    print(f"Radius final: {nps.r_final:.3f} nm")
-    print(f"Diameter final: {nps.r_final * 2:.3f} nm")
-    print(f"Surface: {nps.surface:.3f} nm2")
-    print(f"H per nm2: {nps.H_surface:.3f}")
+    #print(f"Radius final: {nps.r_final:.3f} nm")
+    #print(f"Diameter final: {nps.r_final * 2:.3f} nm")
+    #print(f"Surface: {nps.surface:.3f} nm2")
+    #print(f"H per nm2: {nps.H_surface:.3f}")
 
-    show_surface_nps(nps.faces, diameter)
+    #show_surface_nps(nps.faces, diameter)
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)
