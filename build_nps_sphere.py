@@ -51,10 +51,9 @@ def build_sphere_nps(diameter, file=cell_unit):
     nano.save_xyz(sphere_init, name="sphere_init")
 
     # 3 -- Complete the surface on sphere initial.
-    # self._surface_clean()
-
-    # 4 -- Adding hydrogen and oxygen atoms.
-    # self._surface_fill()
+    #      Add hydrogen and oxygen atoms.
+    sphere_final, connectivity = _surface_clean(sphere_init)
+    nano.save_xyz(sphere_final, name="sphere_final")
 
     # print(self.H_surface)
     # print(self.surface)
@@ -73,6 +72,8 @@ def build_sphere_nps(diameter, file=cell_unit):
 
     # 6 - Assing force field parameters
     #self._get_types_interactions()
+
+    return sphere_final, connectivity
 
 
 def _expand_cell(diameter, cell):
@@ -145,6 +146,32 @@ def _cut_sphere(diameter, box_init, box_length):
     return sphere
 
 
+def _surface_clean(coord):
+    """The surface of the nanoparticle is completed with O, H."""
+    print("Clean surface and search connectivity", end=" -- ")
+    t0 = time.time()
+    # search connectivity
+    # remove not connected atoms
+    connect = nano.connectivity()
+    connect.get_connectivity(coord)
+    connect.add_oxygens()
+    connect.add_hydrogen()
+    sphere = connect.get_df()
+    sphere.reset_index(drop=True, inplace=True)
+
+    # sphere = self._atoms_not_connected(self.sphere_init, connect)
+    # # search connectivity again
+    # connect = self.get_connectivity(sphere)
+    # # update number of bonds for atom
+    # sphere = self._update_nbonds(sphere, connect)
+    # # self.save_xyz(sphere, 'sphere')
+    # self.sphere_clean = sphere.copy()
+    # self.connectivity = connect
+    dt = time.time() - t0
+    print("Done in %.0f s" % dt)
+    return sphere, connect
+
+
 class spherical(nano.NANO):
     """
     Class to represent a specifically spherical nanoparticle
@@ -166,8 +193,9 @@ class spherical(nano.NANO):
         self.diameter = diameter * 10.0
 
         # Gen dataframe estructure with coordinates and connectivity
-        build_sphere_nps(self.diameter, file)
-
+        self.sphere_final, self.connectivity = build_sphere_nps(
+            self.diameter, file
+        )
 
         # Initialize face from surface
         self.faces = None
@@ -215,46 +243,6 @@ class spherical(nano.NANO):
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
         return len(coord) / self.surface2
-
-    def _surface_clean(self):
-        """The surface of the nanoparticle is completed with O, H."""
-        print("Clean surface and search connectivity", end=" -- ")
-        t0 = time.time()
-
-        # search connectivity
-        connect = self.get_connectivity(self.sphere_init)
-
-        # removing no connected atoms
-        sphere = self._atoms_not_connected(self.sphere_init, connect)
-        # search connectivity again
-        connect = self.get_connectivity(sphere)
-
-        # update number of bonds for atom
-        sphere = self._update_nbonds(sphere, connect)
-        # self.save_xyz(sphere, 'sphere')
-
-        self.sphere_clean = sphere.copy()
-        self.connectivity = connect
-
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.sphere_clean, name="sphere_clean")
-
-    def _surface_fill(self):
-        """It adds hydrogen and oxygen to the surface."""
-        print("Adding hydrogen and oxygen atoms", end=" -- ")
-        t0 = time.time()
-        sphere, connect = self._add_oxygens(self.sphere_clean, self.connectivity)
-        sphere, connect = self._add_hydrogen(sphere, connect)
-        # self.save_xyz(sphere, 'sphere_H')
-
-        # search connectivity
-        self.sphere_final = sphere.copy()
-        self.connectivity.update(connect)
-
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-        self.save_xyz(self.sphere_final, name="sphere_fill")
 
     def _interactions_lists(self):
         """Lists of interactions are generated."""

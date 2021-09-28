@@ -6,7 +6,9 @@ Module used to store general classes and methods when dealing with nanoparticles
 import time
 import pandas as pd
 import numpy as np
+from numpy import linalg as LA
 from numpy import random
+import networkx as nx
 import itertools as it
 from scipy.spatial.distance import cdist
 from silica_forcefield import data_atomstype, data_bondstype, data_anglestype
@@ -54,6 +56,164 @@ def save_xyz(coord, name='nps'):
     print(f'Name of xyz file: {xyz}')
 
 
+class connectivity(nx.DiGraph):
+    """Building a class connectivity from directed graphs."""
+    def __init__(self):
+        super().__init__()
+        self._open_si = []
+        self._open_o = []
+
+    def get_connectivity(self, coord):
+        """Build connectivity from coordinates using nodes like atoms."""
+
+        # Add nodes using atoms andsymbols and coordinates
+        for i in coord.index:
+            self.add_node(
+                i,
+                xyz=coord.loc[i, ['x', 'y', 'z']].values,
+                atsb=coord.loc[i, 'atsb']
+            )
+
+        # Add edges like bonds
+        # get pairs atoms bonded
+        pairs = _neighboring_pairs(coord)
+        for i, j in pairs:
+            self.add_edge(i, j)
+            self.add_edge(j, i)
+
+        # remove atoms not conected
+        for i in coord.index:
+            # remove any atom not bonded
+            # and list atoms si, o in surface
+            if self.nbonds(i) == 0:
+                self.remove_node(i)
+
+            elif self.nodes[i]['atsb'] == 'Si' and 1 < self.nbonds(i) < 4:
+                self._open_si.append(i)
+
+            elif self.nodes[i]['atsb'] == 'O' and self.nbonds(i) == 1:
+                self._open_o.append(i)
+
+    def nbonds(self, inode):
+        """Return number of atoms in connected to iat."""
+        return int(self.degree[inode] / 2)
+
+    def add_oxygens(self):
+        """Adding news oxygens to silice with 1 < nb < 4."""
+        natoms = max(list(self.nodes)) + 1
+        for ai in self._open_si:
+            # Silicon coordinates
+            si = np.array(self.nodes[ai]['xyz'], dtype=np.float64)
+            if self.nbonds(ai) == 3:
+                # One bond is required.
+                oxygens = list(self.neighbors(ai))
+                ox1 = np.array(self.nodes[oxygens[0]]['xyz'], dtype=np.float64)
+                ox2 = np.array(self.nodes[oxygens[1]]['xyz'], dtype=np.float64)
+                ox3 = np.array(self.nodes[oxygens[2]]['xyz'], dtype=np.float64)
+                new_ox = (si - ox1) + (si - ox2) + (si - ox3) + si
+                # adding new molecule
+                self._add_new_at(natoms, ai, new_ox, 'O')
+                self._open_o.append(natoms)
+                natoms += 1
+
+            if self.nbonds(ai) == 2:
+                # Two bonds are required.
+                oxygens = list(self.neighbors(ai))
+                ox1 = np.array(self.nodes[oxygens[0]]['xyz'], dtype=np.float64)
+                ox2 = np.array(self.nodes[oxygens[1]]['xyz'], dtype=np.float64)
+                # Calculing new coordinates for two O
+                M = (ox1 + ox2) / 2
+                N = 2 * si - M
+                MA = ox1 - M
+                MP = si - M
+                # MA x MP
+                vnew = np.cross(MA, MP)
+                new_ox1 = N + vnew / LA.norm(MP)
+                new_ox2 = N - vnew / LA.norm(MP)
+                # adding new molecule
+                self._add_new_at(natoms, ai, new_ox1, 'O')
+                self._open_o.append(natoms)
+                natoms += 1
+                self._add_new_at(natoms, ai, new_ox2, 'O')
+                self._open_o.append(natoms)
+                natoms += 1
+
+    def add_hydrogen(self):
+        """Adding hydrogen to terminal oxygens."""
+        natoms = max(list(self.nodes)) + 1
+        dHO = 0.945  # angs
+        thHOSi = 115.0  # degree
+        for ai in self._open_o:
+            # Silicon coordinates
+            ox = np.array(self.nodes[ai]['xyz'], dtype=np.float64)
+            # Silicon connected
+            si = np.array(self.nodes[list(self.neighbors(ai))[0]]['xyz'], dtype=np.float64)
+            # compute the coordinate hydrogen randomly
+            osi_vec = si - ox
+            osi_u = osi_vec / LA.norm(osi_vec)
+            # ramdom insertion of H
+            th = 0.0
+            while not np.isclose(thHOSi, th, atol=1):
+                phi = random.uniform(0, 2 * np.pi, 1)[0]
+                theta = 0.0
+                # Find the sign of the z-axis
+                if osi_vec[2] > 0:
+                    theta += random.uniform(0, np.pi / 2, 1)[0]
+                else:
+                    theta += random.uniform(np.pi / 2, np.pi, 1)[0]
+                dx = dHO * np.cos(phi) * np.sin(theta)
+                dy = dHO * np.sin(phi) * np.sin(theta)
+                dz = dHO * np.cos(theta)
+                oh_vec = np.array([dx, dy, dz])
+                oh_u = oh_vec / LA.norm(oh_vec)
+                h = oh_vec + ox
+                th_hosi = np.arccos(np.dot(oh_u, osi_u))
+                th_hosi *= 180 / np.pi
+                th = np.round(th_hosi, decimals=1)
+
+            self._add_new_at(natoms, ai, h, 'H')
+            natoms += 1
+
+    def _add_new_at(self, n, m, vector, symbol):
+        """Add news atoms in the structure."""
+        self.add_node(
+            n,
+            xyz=vector,
+            atsb=symbol
+        )
+        # adding connectivity
+        self.add_edge(n, m)
+        self.add_edge(m, n)
+
+    def get_df(self):
+        """Return the connectivity as a Pandas DataFrame."""
+        indexs = list(self.nodes)
+        rows = list()
+
+        for i in self.nodes:
+            rows.append({
+                'atsb': self.nodes[i]['atsb'],
+                'x': self.nodes[i]['xyz'][0],
+                'y': self.nodes[i]['xyz'][1],
+                'z': self.nodes[i]['xyz'][2]
+            })
+
+        df = pd.DataFrame(
+            rows, index=indexs
+        )
+        return df
+
+
+def _neighboring_pairs(coord):
+    """Return neighboring pairs"""
+    xyz = coord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
+    # compute distance
+    m = cdist(xyz, xyz, 'euclidean')
+    m = np.triu(m)
+    indexs = np.where((m > 0.) & (m <= 2.0))
+    return map(lambda in0, in1: (in0, in1), indexs[0], indexs[1])
+
+
 class NANO:
     """
     Object nanoparticle
@@ -63,37 +223,6 @@ class NANO:
     def __init__(self, file):
         """The NANO object is initialized by loading a reference structure."""
         pass
-
-    def _neighboring_pairs(self, coord):
-        """Return neighboring pairs"""
-        xyz = coord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
-        # compute distance
-        m = cdist(xyz, xyz, 'euclidean')
-        m = np.triu(m)
-
-        indexs = np.where((m > 0.) & (m <= 2.0))
-
-        return map(lambda in0, in1: (in0, in1), indexs[0], indexs[1])
-
-    def get_connectivity(self, coord):
-        """ Return connectivity of the system no periodic"""
-        connect = dict()
-        pairs = self._neighboring_pairs(coord)
-
-        for i, j in pairs:
-            if i in connect:
-                connect[i].add(j)
-            else:
-                connect[i] = set()
-                connect[i].add(j)
-
-            if j in connect:
-                connect[j].add(i)
-            else:
-                connect[j] = set()
-                connect[j].add(i)
-
-        return connect
 
     def _atoms_not_connected(self, coord, connect):
         # search atoms not connected
@@ -172,8 +301,8 @@ class NANO:
                 # MA x MP
                 vnew = np.cross(MA, MP)
 
-                ox1 = N + vnew / np.linalg.norm(MP)
-                ox2 = N - vnew / np.linalg.norm(MP)
+                ox1 = N + vnew / LA.norm(MP)
+                ox2 = N - vnew / LA.norm(MP)
 
                 newO1 = pd.DataFrame({
                     'atsb': ['O'],
@@ -213,7 +342,7 @@ class NANO:
                     connect[iSi], ['x', 'y', 'z']].values.astype(np.float64)[0]
 
                 sio_vec_i = oxs - si
-                sio_u_i = sio_vec_i / np.linalg.norm(sio_vec_i)
+                sio_u_i = sio_vec_i / LA.norm(sio_vec_i)
 
                 # The first oxygen is inserted randomly.
                 th = 0.0
@@ -232,7 +361,7 @@ class NANO:
                     dz = dSiO * np.cos(theta)
 
                     sio_vec = np.array([dx, dy, dz])
-                    sio_u = sio_vec / np.linalg.norm(sio_vec)
+                    sio_u = sio_vec / LA.norm(sio_vec)
 
                     ox = sio_vec + si
 
@@ -254,8 +383,8 @@ class NANO:
                 # MA x MP
                 vnew = np.cross(MA, MP)
 
-                ox1 = N + vnew / np.linalg.norm(MP)
-                ox2 = N - vnew / np.linalg.norm(MP)
+                ox1 = N + vnew / LA.norm(MP)
+                ox2 = N - vnew / LA.norm(MP)
 
                 newO0 = pd.DataFrame({
                     'atsb': ['O'],
@@ -330,7 +459,7 @@ class NANO:
             # print(si)
 
             osi_vec = si - ox
-            osi_u = osi_vec / np.linalg.norm(osi_vec)
+            osi_u = osi_vec / LA.norm(osi_vec)
 
             # print(osi_vec)
             # print(osi_u)
@@ -352,7 +481,7 @@ class NANO:
                 dz = dHO * np.cos(theta)
 
                 oh_vec = np.array([dx, dy, dz])
-                oh_u = oh_vec / np.linalg.norm(oh_vec)
+                oh_u = oh_vec / LA.norm(oh_vec)
 
                 h = oh_vec + ox
 
