@@ -261,28 +261,20 @@ class spherical(nano.NANO):
     def fixing_surface(self, Hsurface=5.0):
         """Method used to adjust the surface to a surface hydrogen value."""
 
-        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        # if self.H_surface > 5.0:
-        #     self._reach_surface_Q3()
-        # self.save_xyz(self.sphere_final, 'sphere_final')
-        pass
+        # Check that the particle contains a surface type Q3, 4.7 H per nm.
 
-    def test(self):
-        """
-        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-        # if self.H_surface > 5.0:
-        #     self._reach_surface_Q3()
-        # self.save_xyz(self.sphere_final, 'sphere_final')
-        """
+        if self.H_surface > Hsurface:
+            self._reach_surface_Q3(Hsurface)
+        nano.save_xyz(self.sphere_final, 'sphere_test')
 
-    def _reach_surface_Q3(self):
+    def _reach_surface_Q3(self, Hsurface=5.0):
         """Check that the particle contains a surface type Q3, 4.7 H per nm.
         Surface silicon is searched for, which meet the following conditions to
         be bonded to 3 O groups. The search is randomized over the surface si,
         the list is extracted from the sphere_final instance, which is updated
         at each iteration of which
         """
-        print("Removing groups Si(OH)3", end=" -- ")
+        print("Removing groups Si(OH)3", end=" -- \n")
         t0 = time.time()
         dHO = 0.945
         thHOSi = 115.0
@@ -290,9 +282,9 @@ class spherical(nano.NANO):
         natoms_init = len(self.sphere_final)
         nit = 0
 
-        while self.H_surface > 5.0:
+        while self.H_surface > Hsurface:
             coord = self.sphere_final.copy()
-            connectivity = self.connectivity.copy()
+            connect = self.connectivity.copy()
             coord_si = coord[coord.atsb == 'Si']
             surface_si = {3: [], 2: []}
             coord['count_OH'] = 0
@@ -302,10 +294,10 @@ class spherical(nano.NANO):
             # searchinf si near to surface
             for i in coord_si.index:
                 count_OH = 0
-                si_connect = connectivity[i]
+                si_connect = connect.neighbors(i)
                 for j in si_connect:
-                    o_connect = connectivity[j]
-                    if 'H' in list(coord.loc[o_connect, 'atsb'].values):
+                    o_connect = connect.neighbors(j)
+                    if 'H' in list(coord.loc[list(o_connect), 'atsb'].values):
                         count_OH += 1
                 if count_OH == 3:
                     surface_si[3].append(i)
@@ -315,78 +307,55 @@ class spherical(nano.NANO):
                     surface_si[2].append(i)
                     coord.loc[i, 'count_OH'] = 2
 
-            # Dataframe with actual count OH groups for SI
-            # print(coord[coord.count_OH > 2])
-
-            #random.shuffle(surface_si[3])
             random.shuffle(surface_si[2])
-            print(surface_si)
-            # print(coord.loc[surface_si[3], :])
-            # print(coord.loc[surface_si[2], :])
-
             # Search si index like group OSi(OH)3
             if len(surface_si[3]) > 0:
-                for i in surface_si[3]:
-                    # Search for silicon atom connectivity
-                    si_connect = self.connectivity[i]
-                    index_drop = []
-                    for j in si_connect:
-                        # oxygen atom connectivity
-                        o_connect = self.connectivity[j]
-                        o_links = '-'.join(self.sphere_final.loc[o_connect, 'atsb'].values)
-                        if o_links == 'Si-Si':
-                            o_si = [j, i]
-                        else:
-                            index_drop.append(j)
-                    # searching hydrogen
-                    h_drop = []
-                    for o in index_drop:
-                        for h in self.connectivity[o]:
-                            if h != i:
-                                h_drop.append(h)
-                    index_drop += h_drop
-                    # assert len(index_drop) == 6, "Error, six atoms must be skipped"
-                    if len(index_drop) != 6:
-                        print("Error, six atoms must be skipped")
-                        print(f"{len(index_drop)} was selected")
-                        print(self.sphere_final.loc[index_drop, :])
-                        break
+                i = surface_si[3][0]
+                # Search for silicon atom connectivity
+                si_connect = connect.neighbors(i)
+                index_drop = []
+                for j in si_connect:
+                    # oxygen atom connectivity
+                    if connect.at_connect(j) == 'Si-Si':
+                        o_si = [j, i]
+                    else:
+                        index_drop.append(j)
+                # searching hydrogen
+                h_drop = []
+                for o in index_drop:
+                    for h in connect.neighbors(o):
+                        if h != i:
+                            h_drop.append(h)
+                index_drop += h_drop
+                if len(index_drop) != 6:
+                    print("Error, six atoms must be skipped")
+                    print(f"{len(index_drop)} was selected")
+                    print(coord.loc[index_drop, :])
+                    continue
 
-                    # print(index_drop)
-                    # print(coord.loc[index_drop, :])
+                # The OSi(OH)3 group has been selected.
+                for at in index_drop:
+                    connect.remove_node(at)
+                # compute the vector o--si
+                vo = coord.loc[o_si[0], ['x', 'y', 'z']].values
+                vsi = coord.loc[o_si[1], ['x', 'y', 'z']].values
+                u_osi = (vsi - vo) / LA.norm(vsi - vo)
+                xyz_h = dHO * u_osi + vo
+                # Adding in new coord
+                connect.add_new_at(o_si[1], o_si[0], xyz_h, 'H')
+                # saving in the class
 
-                    # The OSi(OH)3 group has been selected.
-                    new_coord = self.sphere_final.drop(index=index_drop)
-                    new_connectivity = self.connectivity.copy()
-                    for at in index_drop:
-                        new_connectivity.pop(at)
-                    # compute the vector o--si
-                    vo = self.sphere_final.loc[o_si[0], ['x', 'y', 'z']].values
-                    vsi = self.sphere_final.loc[o_si[1], ['x', 'y', 'z']].values
-                    u_osi = (vsi - vo) / np.linalg.norm(vsi - vo)
-                    xyz_h = dHO * u_osi + vo
-                    # Adding in new coord
-                    new_coord.loc[o_si[1], 'atsb'] = 'H'
-                    new_coord.loc[o_si[1], 'x'] = xyz_h[0]
-                    new_coord.loc[o_si[1], 'y'] = xyz_h[1]
-                    new_coord.loc[o_si[1], 'z'] = xyz_h[2]
-                    new_coord.loc[o_si[1], 'nb'] = 1
-                    # saving in the class
-                    # new_coord.reset_index(drop=True, inplace=True)
-                    # new_coord.index += 1
-                    # Updating Coordinates and Connectivuty
-                    self.sphere_final = new_coord.copy()
-                    # self.connectivity = self.get_connectivity(self.sphere_final)
-                    self.connectivity = new_connectivity.copy()
-                    is_added = True
-                    if self.H_surface < 5.0:
-                        break
-                    if self.r_final * 2 < self.diameter / 10:
-                        print(" Limite alcanzado, aumente el tamano")
-                        break
-                    # print(i)
+                # Updating Coordinates and Connectivuty
+                self.connectivity = connect.copy()
+                self.sphere_final = connect.get_df()
+
+                is_added = True
+                if self.H_surface < 5.0:
                     break
-
+                if self.r_final * 2 < self.diameter / 10:
+                    print(" Limite alcanzado, aumente el tamano")
+                    break
+            '''
             elif len(surface_si[3]) == 0 and len(surface_si[2]) > 0:
                 n_at_test = len(surface_si[2])
                 for i in surface_si[2]:
@@ -550,17 +519,20 @@ class spherical(nano.NANO):
                             continue
                     # print(i)
                     break
+            '''
 
             if is_added:
-                print('Hola, in while again')
+                print("-"*80)
+                print(surface_si[3])
                 print("New H_surface", self.H_surface)
-                print("N atoms total", len(self.sphere_final))
-                print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
-                print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
-                print("Iteration number", nit)
+                # print("N atoms total", len(self.sphere_final))
+                # print("percentage atoms removed", (natoms_init - len(self.sphere_final)) * 100 / natoms_init, "%")
+                # print("Dimeter actual", self.r_final * 2, "nm, Initial", self.diameter / 10, "nm")
+                # print("Iteration number", nit)
+                print("-"*80)
                 nit += 1
 
-            if nit > 300:
+            if nit > 50:
                 break
 
             # if self.r_final * 2 < round(self.diameter, 0) / 10:
@@ -568,9 +540,12 @@ class spherical(nano.NANO):
             #     break
 
             # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
-            # if len(surface_si[3]) == 0:
-            if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
+            if len(surface_si[3]) == 0:
+                # if len(surface_si[3]) == 0 and len(surface_si[2]) == 0:
                 break
+
+        self.connectivity = self.connectivity.reset_nodes()
+        self.sphere_final = self.connectivity.get_df()
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
 
@@ -666,6 +641,14 @@ def main():
 
     # initialize nanoparticle with diameter's
     nps = spherical(diameter)
+
+    # Fitting surface
+    nps.fixing_surface(Hsurface=5.0)
+
+    print(nps.connectivity)
+    print(len(nps.connectivity))
+    print(nps.sphere_final)
+    exit()
 
     # Gen interaction lists
     nps.get_types_interactions()

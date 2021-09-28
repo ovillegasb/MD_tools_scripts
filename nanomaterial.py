@@ -102,6 +102,17 @@ class connectivity(nx.DiGraph):
         """Return number of atoms in connected to iat."""
         return int(self.degree[inode] / 2)
 
+    def at_connect(self, inode):
+        """Return the atoms symbols conectec to i node"""
+
+        return '-'.join([self.nodes[a]['atsb'] for a in list(self.neighbors(inode))])
+
+    def reset_nodes(self):
+        """Reset le count of node from 0 to sizes nodes -1"""
+        mapping = {value: count for count, value in enumerate(self.nodes, start=1)}
+
+        return nx.relabel_nodes(self, mapping, copy=True)
+
     def add_oxygens(self):
         """Adding news oxygens to silice with 1 < nb < 4."""
         natoms = len(self.nodes)
@@ -117,12 +128,12 @@ class connectivity(nx.DiGraph):
                 new_ox = (si - ox1) + (si - ox2) + (si - ox3) + si
                 # adding new atom O
                 if len(self._id_removed) > 0:
-                    self._add_new_at(self._id_removed[0], ai, new_ox, 'O')
+                    self.add_new_at(self._id_removed[0], ai, new_ox, 'O')
                     self._open_o.append(self._id_removed[0])
                     self._id_removed.pop(0)
                     natoms += 1
                 else:
-                    self._add_new_at(natoms, ai, new_ox, 'O')
+                    self.add_new_at(natoms, ai, new_ox, 'O')
                     self._open_o.append(natoms)
                     natoms += 1
 
@@ -142,23 +153,23 @@ class connectivity(nx.DiGraph):
                 new_ox2 = N - vnew / LA.norm(MP)
                 # adding new atom O1
                 if len(self._id_removed) > 0:
-                    self._add_new_at(self._id_removed[0], ai, new_ox1, 'O')
+                    self.add_new_at(self._id_removed[0], ai, new_ox1, 'O')
                     self._open_o.append(self._id_removed[0])
                     self._id_removed.pop(0)
                     natoms += 1
                 else:
-                    self._add_new_at(natoms, ai, new_ox1, 'O')
+                    self.add_new_at(natoms, ai, new_ox1, 'O')
                     self._open_o.append(natoms)
                     natoms += 1
 
                 # adding new atom O2
                 if len(self._id_removed) > 0:
-                    self._add_new_at(self._id_removed[0], ai, new_ox2, 'O')
+                    self.add_new_at(self._id_removed[0], ai, new_ox2, 'O')
                     self._open_o.append(self._id_removed[0])
                     self._id_removed.pop(0)
                     natoms += 1
                 else:
-                    self._add_new_at(natoms, ai, new_ox2, 'O')
+                    self.add_new_at(natoms, ai, new_ox2, 'O')
                     self._open_o.append(natoms)
                     natoms += 1
 
@@ -195,10 +206,10 @@ class connectivity(nx.DiGraph):
                 th_hosi *= 180 / np.pi
                 th = np.round(th_hosi, decimals=1)
 
-            self._add_new_at(natoms, ai, h, 'H')
+            self.add_new_at(natoms, ai, h, 'H')
             natoms += 1
 
-    def _add_new_at(self, n, m, vector, symbol):
+    def add_new_at(self, n, m, vector, symbol):
         """Add news atoms in the structure."""
         self.add_node(
             n,
