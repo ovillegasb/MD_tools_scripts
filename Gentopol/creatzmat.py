@@ -5,7 +5,7 @@ Submodule dedicated to create a file with the Z matrix to be used by BOSS.
 
 import os
 import collections
-import algebra as al
+from Gentopol import algebra as al
 import networkx as nx
 import numpy as np
 

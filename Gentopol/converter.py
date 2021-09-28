@@ -3,10 +3,10 @@ Submodule dedicated to deal with the inputs and configure the outputs.
 
 """
 
-from creatzmat import GenMolRep
+from .creatzmat import GenMolRep
 from shutil import which
-from BOSSReader import BOSSReader, CheckForHs
-from BOSS2GMX import mainBOSS2GMX
+from .BOSSReader import BOSSReader, CheckForHs
+from .BOSS2GMX import mainBOSS2GMX
 import os
 import pickle
 

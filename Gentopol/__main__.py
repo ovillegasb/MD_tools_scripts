@@ -4,7 +4,7 @@ field for OPLSAA.
 
 """
 import argparse
-from converter import convert
+from .converter import convert
 
 
 def options():
@@ -104,7 +104,6 @@ def options():
 def main():
 
     args = options()
-    print(args)
 
     convert(**args)
 

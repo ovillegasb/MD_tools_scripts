@@ -1,11 +1,11 @@
 from __future__ import print_function
 import os
 import numpy as np
-from mol_boss import new_mol_info
+from .mol_boss import new_mol_info
 import pandas as pd
 from collections import OrderedDict
 
-from LigParGen.fepzmat import BCC_file2zmat
+from .fepzmat import BCC_file2zmat
 
 
 def VerifyMolandSave(mol,charge,resname):

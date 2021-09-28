@@ -14,8 +14,8 @@ argparse
 numpy
 """
 
-from BOSSReader import ucomb, pairing_func, bossPdbAtom2Element, bossElement2Mass
-from BOSSReader import Refine_PDB_file, get_coos_from_pdb
+from .BOSSReader import ucomb, pairing_func, bossPdbAtom2Element, bossElement2Mass
+from .BOSSReader import Refine_PDB_file, get_coos_from_pdb
 import pickle
 import pandas as pd
 import numpy as np
@@ -125,7 +125,9 @@ def boss2opmTorsion(bnd_df, num2opls, st_no, molecule_data, itpf):
         final_df['NAME'] = final_df.TI + '-' + final_df.TJ + '-' + final_df.TK + '-' + final_df.TL
         final_df = final_df.sort_values(['NAME'])
         tor_bos = final_df.drop(
-            ['I', 'J', 'K', 'L', 'TI', 'TJ', 'TK', 'TL'], 1)
+            labels=['I', 'J', 'K', 'L', 'TI', 'TJ', 'TK', 'TL'],
+            axis=1
+        )
         tor_bos = tor_bos.drop_duplicates()
         df = final_df.loc[tor_bos.index, :]
         return final_df, df
