@@ -48,12 +48,12 @@ def build_sphere_nps(diameter, file=cell_unit):
 
     # 2 -- cut sphere in a sphere from the center of box.
     sphere_init = _cut_sphere(diameter, box_init, box_length)
-    nano.save_xyz(sphere_init, name="sphere_init")
+    # nano.save_xyz(sphere_init, name="sphere_init")
 
     # 3 -- Complete the surface on sphere initial.
     #      Add hydrogen and oxygen atoms.
     sphere_final, connectivity = _surface_clean(sphere_init)
-    nano.save_xyz(sphere_final, name="sphere_final")
+    # nano.save_xyz(sphere_final, name="sphere_final")
 
     return sphere_final, connectivity, box_length
 
@@ -358,167 +358,166 @@ class spherical(nano.NANO):
             '''
             elif len(surface_si[3]) == 0 and len(surface_si[2]) > 0:
                 n_at_test = len(surface_si[2])
-                for i in surface_si[2]:
-                    # Search for silicon atom connectivity
-                    si_connect = self.connectivity[i]
-                    index_drop = []
-                    news_oxygen_free = []
-                    for j in si_connect:
-                        # oxygen atom connectivity
-                        o_connect = self.connectivity[j]
-                        try:
-                            o_links = '-'.join(self.sphere_final.loc[o_connect, 'atsb'].values)
-                        except KeyError:
-                            print("Error")
-                            print(j)
-                            print(o_connect)
-                            print(self.sphere_final.loc[j, :])
-                            exit()
-                        if o_links == 'Si-Si':
-                            news_oxygen_free.append(j)
-                        else:
-                            index_drop.append(j)
-
-                    # searching hydrogen
-                    h_drop = []
-                    for o in index_drop:
-                        for h in self.connectivity[o]:
-                            if h != i:
-                                h_drop.append(h)
-                    index_drop += h_drop
-                    # adding i from silice
-                    news_oxygen_free.append(i)
-                    # print(index_drop)
-                    if len(index_drop) != 4:
-                        print(f"Error, five atoms must be skipped: {len(index_drop)}")
-                        # print(self.sphere_final.loc[index_drop, :])
-                        # exit()
-                        continue
-                    # assert len(index_drop) == 4, f"Error, five atoms must be skipped: {len(index_drop)}"
-                    # The O2Si(OH)2 group has been selected.
-                    new_coord = self.sphere_final.drop(index=index_drop)
-                    new_connectivity = self.connectivity.copy()
-                    for at in index_drop:
-                        new_connectivity.pop(at)
-                    # print(new_connectivity[news_oxygen_free[1]])
-                    # adding firt oxygen to index i
-                    # Oxygen coordinate
-                    ox = self.sphere_final.loc[
-                        news_oxygen_free[0],
-                        ['x', 'y', 'z']
-                    ].values.astype(np.float64)
-                    # Silicon connected (count_OH = 0)
-                    si = self.sphere_final.loc[
-                        new_connectivity[news_oxygen_free[0]]
-                    ].drop(index=i)
-                    v_si = si.loc[:, ['x', 'y', 'z']].values.astype(np.float64)[0]
-                    osi_vec = v_si - ox
-                    osi_u = osi_vec / np.linalg.norm(osi_vec)
-                    # ramdom insertion of firt H
-                    th = 0.0
-                    while not np.isclose(thHOSi, th, atol=1):
-                        phi = random.uniform(0, 2 * np.pi, 1)[0]
-                        theta = 0.0
-                        # Find the sign of the z-axis
-                        if osi_vec[2] > 0:
-                            theta += random.uniform(0, np.pi / 2, 1)[0]
-                        else:
-                            theta += random.uniform(np.pi / 2, np.pi, 1)[0]
-                        dx = dHO * np.cos(phi) * np.sin(theta)
-                        dy = dHO * np.sin(phi) * np.sin(theta)
-                        dz = dHO * np.cos(theta)
-                        oh_vec = np.array([dx, dy, dz])
-                        oh_u = oh_vec / np.linalg.norm(oh_vec)
-                        h = oh_vec + ox
-                        th_hosi = np.arccos(np.dot(oh_u, osi_u))
-                        th_hosi *= 180 / np.pi
-                        th = np.round(th_hosi, decimals=1)
-                        # Adding in new coord
-                        new_coord.loc[news_oxygen_free[-1], 'atsb'] = 'H'
-                        new_coord.loc[news_oxygen_free[-1], 'x'] = h[0]
-                        new_coord.loc[news_oxygen_free[-1], 'y'] = h[1]
-                        new_coord.loc[news_oxygen_free[-1], 'z'] = h[2]
-                        new_coord.loc[news_oxygen_free[-1], 'nb'] = 1
-                        new_coord.loc[news_oxygen_free[-1], 'count_OH'] = None
-                    # adding seconf oxygen to new index
-                    # Oxygen coordinate
-                    ox = self.sphere_final.loc[
-                        news_oxygen_free[1],
-                        ['x', 'y', 'z']
-                    ].values.astype(np.float64)
-                    # Silicon connected (count_OH = 0)
-                    # print(new_connectivity[news_oxygen_free[1]])
-                    si = self.sphere_final.loc[
-                        new_connectivity[news_oxygen_free[1]]
-                    ].drop(index=i)
-                    v_si = si.loc[:, ['x', 'y', 'z']].values.astype(np.float64)[0]
-                    osi_vec = v_si - ox
-                    osi_u = osi_vec / np.linalg.norm(osi_vec)
-                    # ramdom insertion of firt H
-                    th = 0.0
-                    while not np.isclose(thHOSi, th, atol=1):
-                        phi = random.uniform(0, 2 * np.pi, 1)[0]
-                        theta = 0.0
-                        # Find the sign of the z-axis
-                        if osi_vec[2] > 0:
-                            theta += random.uniform(0, np.pi / 2, 1)[0]
-                        else:
-                            theta += random.uniform(np.pi / 2, np.pi, 1)[0]
-                        dx = dHO * np.cos(phi) * np.sin(theta)
-                        dy = dHO * np.sin(phi) * np.sin(theta)
-                        dz = dHO * np.cos(theta)
-                        oh_vec = np.array([dx, dy, dz])
-                        oh_u = oh_vec / np.linalg.norm(oh_vec)
-                        h = oh_vec + ox
-                        th_hosi = np.arccos(np.dot(oh_u, osi_u))
-                        th_hosi *= 180 / np.pi
-                        th = np.round(th_hosi, decimals=1)
-                    natoms = self.sphere_final.index[-1] + 1
-                    # add row to system coordinate
-                    newH = pd.DataFrame({
-                        'atsb': ['H'],
-                        'x': [h[0]],
-                        'y': [h[1]],
-                        'z': [h[2]],
-                        'nb': [1],
-                        'count_OH': [None]}, index=[natoms])
-                    new_coord = pd.concat([new_coord, newH], ignore_index=False)
-                    new_connectivity[news_oxygen_free[1]].remove(i)
-                    new_connectivity[news_oxygen_free[1]].add(natoms)
-                    new_connectivity[natoms] = set()
-                    new_connectivity[natoms].add(news_oxygen_free[1])
-
-                    """Surface area from ConvexHull"""
-                    hcoord = new_coord[new_coord.atsb == 'H']
-                    xyz = hcoord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
-                    hull = ConvexHull(xyz)
-
-                    h_surface_test = len(hcoord) / hull.area / 100
-
-                    if h_surface_test < self.H_surface:
-                        # saving in the class
-                        print('test', h_surface_test, 'back', self.H_surface)
-                        self.sphere_final = new_coord.copy()
-                        self.connectivity = new_connectivity.copy()
-                        is_added = True
-
-                        if self.H_surface < 5.0:
-                            break
-
-                        if self.r_final * 2 < self.diameter / 10:
-                            print(" Limite alcanzado, aumente el tamano")
-                            break
-
-                    else:
-                        print(f'{i} dont added')
+                i = surface_si[2][0]
+                # for i in surface_si[2]:
+                # Search for silicon atom connectivity
+                si_connect = self.connectivity[i]
+                index_drop = []
+                news_oxygen_free = []
+                for j in si_connect:
+                    # oxygen atom connectivity
+                    o_connect = self.connectivity[j]
+                    try:
+                        o_links = '-'.join(self.sphere_final.loc[o_connect, 'atsb'].values)
+                    except KeyError:
+                        print("Error")
+                        print(j)
+                        print(o_connect)
+                        print(self.sphere_final.loc[j, :])
                         exit()
-                        n_at_test -= 1
-                        if n_at_test == 0:
-                            break
-                        else:
-                            continue
-                    # print(i)
-                    break
+                    if o_links == 'Si-Si':
+                        news_oxygen_free.append(j)
+                    else:
+                        index_drop.append(j)
+
+                # searching hydrogen
+                h_drop = []
+                for o in index_drop:
+                    for h in self.connectivity[o]:
+                        if h != i:
+                            h_drop.append(h)
+                index_drop += h_drop
+                # adding i from silice
+                news_oxygen_free.append(i)
+                # print(index_drop)
+                if len(index_drop) != 4:
+                    print(f"Error, five atoms must be skipped: {len(index_drop)}")
+                    # print(self.sphere_final.loc[index_drop, :])
+                    # exit()
+                    continue
+                # assert len(index_drop) == 4, f"Error, five atoms must be skipped: {len(index_drop)}"
+                # The O2Si(OH)2 group has been selected.
+                new_coord = self.sphere_final.drop(index=index_drop)
+                new_connectivity = self.connectivity.copy()
+                for at in index_drop:
+                    new_connectivity.pop(at)
+                # print(new_connectivity[news_oxygen_free[1]])
+                # adding firt oxygen to index i
+                # Oxygen coordinate
+                ox = self.sphere_final.loc[
+                    news_oxygen_free[0],
+                    ['x', 'y', 'z']
+                ].values.astype(np.float64)
+                # Silicon connected (count_OH = 0)
+                si = self.sphere_final.loc[
+                    new_connectivity[news_oxygen_free[0]]
+                ].drop(index=i)
+                v_si = si.loc[:, ['x', 'y', 'z']].values.astype(np.float64)[0]
+                osi_vec = v_si - ox
+                osi_u = osi_vec / np.linalg.norm(osi_vec)
+                # ramdom insertion of firt H
+                th = 0.0
+                while not np.isclose(thHOSi, th, atol=1):
+                    phi = random.uniform(0, 2 * np.pi, 1)[0]
+                    theta = 0.0
+                    # Find the sign of the z-axis
+                    if osi_vec[2] > 0:
+                        theta += random.uniform(0, np.pi / 2, 1)[0]
+                    else:
+                        theta += random.uniform(np.pi / 2, np.pi, 1)[0]
+                    dx = dHO * np.cos(phi) * np.sin(theta)
+                    dy = dHO * np.sin(phi) * np.sin(theta)
+                    dz = dHO * np.cos(theta)
+                    oh_vec = np.array([dx, dy, dz])
+                    oh_u = oh_vec / np.linalg.norm(oh_vec)
+                    h = oh_vec + ox
+                    th_hosi = np.arccos(np.dot(oh_u, osi_u))
+                    th_hosi *= 180 / np.pi
+                    th = np.round(th_hosi, decimals=1)
+                    # Adding in new coord
+                    new_coord.loc[news_oxygen_free[-1], 'atsb'] = 'H'
+                    new_coord.loc[news_oxygen_free[-1], 'x'] = h[0]
+                    new_coord.loc[news_oxygen_free[-1], 'y'] = h[1]
+                    new_coord.loc[news_oxygen_free[-1], 'z'] = h[2]
+                    new_coord.loc[news_oxygen_free[-1], 'nb'] = 1
+                    new_coord.loc[news_oxygen_free[-1], 'count_OH'] = None
+                # adding seconf oxygen to new index
+                # Oxygen coordinate
+                ox = self.sphere_final.loc[
+                    news_oxygen_free[1],
+                    ['x', 'y', 'z']
+                ].values.astype(np.float64)
+                # Silicon connected (count_OH = 0)
+                # print(new_connectivity[news_oxygen_free[1]])
+                si = self.sphere_final.loc[
+                    new_connectivity[news_oxygen_free[1]]
+                ].drop(index=i)
+                v_si = si.loc[:, ['x', 'y', 'z']].values.astype(np.float64)[0]
+                osi_vec = v_si - ox
+                osi_u = osi_vec / np.linalg.norm(osi_vec)
+                # ramdom insertion of firt H
+                th = 0.0
+                while not np.isclose(thHOSi, th, atol=1):
+                    phi = random.uniform(0, 2 * np.pi, 1)[0]
+                    theta = 0.0
+                    # Find the sign of the z-axis
+                    if osi_vec[2] > 0:
+                        theta += random.uniform(0, np.pi / 2, 1)[0]
+                    else:
+                        theta += random.uniform(np.pi / 2, np.pi, 1)[0]
+                    dx = dHO * np.cos(phi) * np.sin(theta)
+                    dy = dHO * np.sin(phi) * np.sin(theta)
+                    dz = dHO * np.cos(theta)
+                    oh_vec = np.array([dx, dy, dz])
+                    oh_u = oh_vec / np.linalg.norm(oh_vec)
+                    h = oh_vec + ox
+                    th_hosi = np.arccos(np.dot(oh_u, osi_u))
+                    th_hosi *= 180 / np.pi
+                    th = np.round(th_hosi, decimals=1)
+                natoms = self.sphere_final.index[-1] + 1
+                # add row to system coordinate
+                newH = pd.DataFrame({
+                    'atsb': ['H'],
+                    'x': [h[0]],
+                    'y': [h[1]],
+                    'z': [h[2]],
+                    'nb': [1],
+                    'count_OH': [None]}, index=[natoms])
+                new_coord = pd.concat([new_coord, newH], ignore_index=False)
+                new_connectivity[news_oxygen_free[1]].remove(i)
+                new_connectivity[news_oxygen_free[1]].add(natoms)
+                new_connectivity[natoms] = set()
+                new_connectivity[natoms].add(news_oxygen_free[1])
+
+                """Surface area from ConvexHull"""
+                hcoord = new_coord[new_coord.atsb == 'H']
+                xyz = hcoord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
+                hull = ConvexHull(xyz)
+
+                h_surface_test = len(hcoord) / hull.area / 100
+
+                if h_surface_test < self.H_surface:
+                    # saving in the class
+                    print('test', h_surface_test, 'back', self.H_surface)
+                    self.sphere_final = new_coord.copy()
+                    self.connectivity = new_connectivity.copy()
+                    is_added = True
+
+                    if self.H_surface < 5.0:
+                        break
+
+                    if self.r_final * 2 < self.diameter / 10:
+                        print(" Limite alcanzado, aumente el tamano")
+                        break
+
+                else:
+                    print(f'{i} dont added')
+                    exit()
+                    n_at_test -= 1
+                    if n_at_test == 0:
+                        break
+                    else:
+                        continue
             '''
 
             if is_added:
@@ -644,11 +643,6 @@ def main():
 
     # Fitting surface
     nps.fixing_surface(Hsurface=5.0)
-
-    print(nps.connectivity)
-    print(len(nps.connectivity))
-    print(nps.sphere_final)
-    exit()
 
     # Gen interaction lists
     nps.get_types_interactions()
