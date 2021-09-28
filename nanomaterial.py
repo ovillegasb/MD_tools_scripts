@@ -631,16 +631,14 @@ class NANO:
             # For H
             if coord.loc[i, 'atsb'] == 'H':
                 coord.loc[i, 'type'] = 'Hsurf'
-
             # For Si
             if coord.loc[i, 'atsb'] == 'Si':
                 coord.loc[i, 'type'] = 'SIbulk'
-
             # For O bulk and surf
             if coord.loc[i, 'atsb'] == 'O':
                 n_Si = 0
                 n_H = 0
-                for j in connect[i]:
+                for j in connect.neighbors(i):
                     if coord.loc[j, 'atsb'] == 'Si':
                         n_Si += 1
                     if coord.loc[j, 'atsb'] == 'H':
@@ -679,19 +677,8 @@ class NANO:
         return coord, dfbonds, dfangles
 
     def save_forcefield(self, coord, box, res='NPS'):
-        # Testing if Si and H its ok
-        sicoord = coord[(coord['atsb'] == 'Si') & (coord['nb'] < 4)]
-        ocoord = coord[(coord['atsb'] == 'O') & (coord['nb'] < 2)]
-
-        if len(sicoord) != 0 or len(ocoord) != 0:
-            print('ERROR atoms')
-            print(f'silice {sicoord}')
-            print(f'oxygens {ocoord}')
-            print('gro and itp not saved')
-
-        else:
-            self.write_gro(coord, box, res)
-            self.write_itp(res)
+        self.write_gro(coord, box, res)
+        self.write_itp(res)
 
     def write_gro(self, coord, box, res='NPS'):
         """

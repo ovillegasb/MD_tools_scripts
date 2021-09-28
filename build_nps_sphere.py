@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 from scipy.spatial import ConvexHull
 import mpl_toolkits.mplot3d as a3
 import matplotlib as mpl
+import networkx as nx
 
 
 # dat location
@@ -54,7 +55,7 @@ def build_sphere_nps(diameter, file=cell_unit):
     sphere_final, connectivity = _surface_clean(sphere_init)
     nano.save_xyz(sphere_final, name="sphere_final")
 
-    return sphere_final, connectivity
+    return sphere_final, connectivity, box_length
 
 
 def _expand_cell(diameter, cell):
@@ -113,7 +114,7 @@ def _cut_sphere(diameter, box_init, box_length):
     # center of box
     center = box_length / 2
     # sphere radio
-    r = (diameter + 2) / 2
+    r = (diameter + 1) / 2
     # searching atoms in sphere
     for i in coord.index:
         vec = coord.loc[i, ['x', 'y', 'z']].values.astype(np.float64)
@@ -164,7 +165,7 @@ class spherical(nano.NANO):
         self.diameter = diameter * 10.0
 
         # Gen dataframe estructure with coordinates and connectivity
-        self.sphere_final, self.connectivity = build_sphere_nps(
+        self.sphere_final, self.connectivity, self.box_length = build_sphere_nps(
             self.diameter, file
         )
 
@@ -206,38 +207,53 @@ class spherical(nano.NANO):
 
         return len(coord) / self.surface
 
-    def _interactions_lists(self):
+    def _get_interctions_list(self):
         """Lists of interactions are generated."""
-        print("Bonds list", end=" -- ")
+        print("Get interactions List", end=" -- ")
+        t0 = time.time()
+
         connect = self.connectivity
-        t0 = time.time()
-        self.bonds_list = self._get_bonds_list(connect)
+
+        all_ps = dict(nx.algorithms.all_pairs_shortest_path_length(connect))
+        all_paths = []
+
+        for s in all_ps.keys():
+            for e in all_ps[s].keys():
+                if all_ps[s][e] == 1:
+                    all_paths += list(nx.algorithms.all_simple_paths(connect, s, e, cutoff=1))
+
+                elif all_ps[s][e] == 2:
+                    all_paths += list(nx.algorithms.all_simple_paths(connect, s, e, cutoff=2))
+
+                elif all_ps[s][e] == 3:
+                    all_paths += list(nx.algorithms.all_simple_paths(connect, s, e, cutoff=3))
+
+        bonds_list = [tuple(p) for p in all_paths if len(set(p)) == 2]
+        angles_list = [tuple(p) for p in all_paths if len(set(p)) == 3]
+        pairs_list = [(p[0], p[3]) for p in all_paths if len(set(p)) == 4]
+
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
 
-        print("Angles list", end=" -- ")
-        t0 = time.time()
-        # angles and pairs 1-4
-        self.angles_list = self.get_angles_list(
-            self.connectivity, self.bonds_list)
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
+        return bonds_list, angles_list, pairs_list
 
-        print("Pairs list", end=" -- ")
-        t0 = time.time()
-        self.pairs_list = self.get_pairs_list(
-            self.bonds_list, self.angles_list)
-        dt = time.time() - t0
-        print("Done in %.0f s" % dt)
-
-    def _get_types_interactions(self):
+    def get_types_interactions(self):
         """ Searching atoms, bonds angles types."""
+
+        # Call the list of interactions
+        bonds_list, angles_list, pairs_list = self._get_interctions_list()
 
         print("assigning force field parameters", end=" -- ")
         t0 = time.time()
 
         self.dfatoms, self.dfbonds, self.dfangles = self._set_atoms_types(
-            self.sphere_final, self.connectivity, self.bonds_list, self.angles_list)
+                self.sphere_final,
+                self.connectivity,
+                bonds_list,
+                angles_list
+            )
+
+        self.pairs_list = pairs_list
 
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
@@ -594,15 +610,17 @@ def center_of_mass(coords, masses=None):
     return np.sum(coords * masses[:, np.newaxis], axis=0) / masses.sum()
 
 
-def show_surface_nps(faces, d):
+def show_surface_nps(coord, faces, d):
+    hcoord = coord[coord.atsb == 'H']
+    xyz = hcoord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
     plt.figure(figsize=(10, 10))
     ax = plt.axes(projection='3d')
 
     # ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], color='b')
 
-    ax.set_xlim3d(0, d * 10)
-    ax.set_ylim3d(0, d * 10)
-    ax.set_zlim3d(0, d * 10)
+    ax.set_xlim3d(0, xyz[:, 0].max())
+    ax.set_ylim3d(0, xyz[:, 1].max())
+    ax.set_zlim3d(0, xyz[:, 2].max())
 
     for f in faces:
         face = a3.art3d.Poly3DCollection([f])
@@ -649,15 +667,19 @@ def main():
     # initialize nanoparticle with diameter's
     nps = spherical(diameter)
 
+    # Gen interaction lists
+    nps.get_types_interactions()
+
     # saving files
-    # nps.save_forcefield(nps.dfatoms, nps.box_length)
+    nps.save_forcefield(nps.dfatoms, nps.box_length)
 
     print(f"Radius final: {nps.r_final:.3f} nm")
     print(f"Diameter final: {nps.r_final * 2:.3f} nm")
     print(f"Surface: {nps.surface:.3f} nm2")
     print(f"H per nm2: {nps.H_surface:.3f}")
 
-    show_surface_nps(nps.faces, diameter)
+    # Show surface H
+    show_surface_nps(nps.dfatoms, nps.faces, diameter)
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)
