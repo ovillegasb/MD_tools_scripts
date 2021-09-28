@@ -63,6 +63,9 @@ class connectivity(nx.DiGraph):
         self._open_si = []
         self._open_o = []
 
+        # index checker
+        self._id_removed = []
+
     def get_connectivity(self, coord):
         """Build connectivity from coordinates using nodes like atoms."""
 
@@ -87,6 +90,7 @@ class connectivity(nx.DiGraph):
             # and list atoms si, o in surface
             if self.nbonds(i) == 0:
                 self.remove_node(i)
+                self._id_removed.append(i)
 
             elif self.nodes[i]['atsb'] == 'Si' and 1 < self.nbonds(i) < 4:
                 self._open_si.append(i)
@@ -100,7 +104,7 @@ class connectivity(nx.DiGraph):
 
     def add_oxygens(self):
         """Adding news oxygens to silice with 1 < nb < 4."""
-        natoms = max(list(self.nodes)) + 1
+        natoms = len(self.nodes)
         for ai in self._open_si:
             # Silicon coordinates
             si = np.array(self.nodes[ai]['xyz'], dtype=np.float64)
@@ -111,10 +115,16 @@ class connectivity(nx.DiGraph):
                 ox2 = np.array(self.nodes[oxygens[1]]['xyz'], dtype=np.float64)
                 ox3 = np.array(self.nodes[oxygens[2]]['xyz'], dtype=np.float64)
                 new_ox = (si - ox1) + (si - ox2) + (si - ox3) + si
-                # adding new molecule
-                self._add_new_at(natoms, ai, new_ox, 'O')
-                self._open_o.append(natoms)
-                natoms += 1
+                # adding new atom O
+                if len(self._id_removed) > 0:
+                    self._add_new_at(self._id_removed[0], ai, new_ox, 'O')
+                    self._open_o.append(self._id_removed[0])
+                    self._id_removed.pop(0)
+                    natoms += 1
+                else:
+                    self._add_new_at(natoms, ai, new_ox, 'O')
+                    self._open_o.append(natoms)
+                    natoms += 1
 
             if self.nbonds(ai) == 2:
                 # Two bonds are required.
@@ -130,13 +140,27 @@ class connectivity(nx.DiGraph):
                 vnew = np.cross(MA, MP)
                 new_ox1 = N + vnew / LA.norm(MP)
                 new_ox2 = N - vnew / LA.norm(MP)
-                # adding new molecule
-                self._add_new_at(natoms, ai, new_ox1, 'O')
-                self._open_o.append(natoms)
-                natoms += 1
-                self._add_new_at(natoms, ai, new_ox2, 'O')
-                self._open_o.append(natoms)
-                natoms += 1
+                # adding new atom O1
+                if len(self._id_removed) > 0:
+                    self._add_new_at(self._id_removed[0], ai, new_ox1, 'O')
+                    self._open_o.append(self._id_removed[0])
+                    self._id_removed.pop(0)
+                    natoms += 1
+                else:
+                    self._add_new_at(natoms, ai, new_ox1, 'O')
+                    self._open_o.append(natoms)
+                    natoms += 1
+
+                # adding new atom O2
+                if len(self._id_removed) > 0:
+                    self._add_new_at(self._id_removed[0], ai, new_ox2, 'O')
+                    self._open_o.append(self._id_removed[0])
+                    self._id_removed.pop(0)
+                    natoms += 1
+                else:
+                    self._add_new_at(natoms, ai, new_ox2, 'O')
+                    self._open_o.append(natoms)
+                    natoms += 1
 
     def add_hydrogen(self):
         """Adding hydrogen to terminal oxygens."""

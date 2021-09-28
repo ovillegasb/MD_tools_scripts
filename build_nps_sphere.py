@@ -19,7 +19,6 @@ import itertools as it
 from scipy.spatial.distance import cdist
 import nanomaterial as nano
 import matplotlib.pyplot as plt
-from scipy.spatial import Delaunay
 from scipy.spatial import ConvexHull
 import mpl_toolkits.mplot3d as a3
 import matplotlib as mpl
@@ -54,24 +53,6 @@ def build_sphere_nps(diameter, file=cell_unit):
     #      Add hydrogen and oxygen atoms.
     sphere_final, connectivity = _surface_clean(sphere_init)
     nano.save_xyz(sphere_final, name="sphere_final")
-
-    # print(self.H_surface)
-    # print(self.surface)
-    # Hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
-    # self.save_xyz(Hcoord, 'Only_Hatoms')
-    # show_surface_nps(Hcoord)
-    # exit()
-
-    # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
-    # if self.H_surface > 5.0:
-    #     self._reach_surface_Q3()
-    # self.save_xyz(self.sphere_final, 'sphere_final')
-
-    # 5 -- Lists of interactions are generated
-    #self._interactions_lists()
-
-    # 6 - Assing force field parameters
-    #self._get_types_interactions()
 
     return sphere_final, connectivity
 
@@ -157,16 +138,6 @@ def _surface_clean(coord):
     connect.add_oxygens()
     connect.add_hydrogen()
     sphere = connect.get_df()
-    sphere.reset_index(drop=True, inplace=True)
-
-    # sphere = self._atoms_not_connected(self.sphere_init, connect)
-    # # search connectivity again
-    # connect = self.get_connectivity(sphere)
-    # # update number of bonds for atom
-    # sphere = self._update_nbonds(sphere, connect)
-    # # self.save_xyz(sphere, 'sphere')
-    # self.sphere_clean = sphere.copy()
-    # self.connectivity = connect
     dt = time.time() - t0
     print("Done in %.0f s" % dt)
     return sphere, connect
@@ -217,11 +188,6 @@ class spherical(nano.NANO):
 
     @property
     def surface(self):
-        """area from surface."""
-        return 4 * np.pi * self.r_final**2
-
-    @property
-    def surface2(self):
         """Surface area from ConvexHull"""
         hcoord = self.sphere_final[self.sphere_final.atsb == 'H']
         xyz = hcoord.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
@@ -230,11 +196,7 @@ class spherical(nano.NANO):
         indexs = hull.simplices
         self.faces = xyz[indexs]
 
-        # print('area:', hull.area)
-        # print('volume:', hull.volume)
-
         # return in nanometers^2
-
         return hull.area / 100
 
     @property
@@ -242,7 +204,7 @@ class spherical(nano.NANO):
         """Number of H per nm2"""
         coord = self.sphere_final[self.sphere_final.atsb == 'H']
 
-        return len(coord) / self.surface2
+        return len(coord) / self.surface
 
     def _interactions_lists(self):
         """Lists of interactions are generated."""
@@ -279,6 +241,23 @@ class spherical(nano.NANO):
 
         dt = time.time() - t0
         print("Done in %.0f s" % dt)
+
+    def fixing_surface(self, Hsurface=5.0):
+        """Method used to adjust the surface to a surface hydrogen value."""
+
+        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
+        # if self.H_surface > 5.0:
+        #     self._reach_surface_Q3()
+        # self.save_xyz(self.sphere_final, 'sphere_final')
+        pass
+
+    def test(self):
+        """
+        # 4.1 -- Check that the particle contains a surface type Q3, 4.7 H per nm.
+        # if self.H_surface > 5.0:
+        #     self._reach_surface_Q3()
+        # self.save_xyz(self.sphere_final, 'sphere_final')
+        """
 
     def _reach_surface_Q3(self):
         """Check that the particle contains a surface type Q3, 4.7 H per nm.
@@ -615,65 +594,8 @@ def center_of_mass(coords, masses=None):
     return np.sum(coords * masses[:, np.newaxis], axis=0) / masses.sum()
 
 
-def show_mesh_nps(coords):
-
-    xyz = coords.loc[:, ['x', 'y', 'z']].values.astype(np.float64)
-    tri = Delaunay(xyz)
-    # print(tri)
-
-    def collect_edges(tri):
-        edges = set()
-
-        def sorted_tuple(a, b):
-            return (a, b) if a < b else (b, a)
-
-        # Add edges of tetrahedron (sorted so we don't add an edge twice, even if it comes in reverse order).
-        for (i0, i1, i2, i3) in tri.simplices:
-            edges.add(sorted_tuple(i0, i1))
-            edges.add(sorted_tuple(i0, i2))
-            edges.add(sorted_tuple(i0, i3))
-            edges.add(sorted_tuple(i1, i2))
-            edges.add(sorted_tuple(i1, i3))
-            edges.add(sorted_tuple(i2, i3))
-        return edges
-
-    def plot_tri_2(ax, points, tri):
-        edges = collect_edges(tri)
-        x = np.array([])
-        y = np.array([])
-        z = np.array([])
-        for (i, j) in edges:
-            x = np.append(x, [points[i, 0], points[j, 0], np.nan])      
-            y = np.append(y, [points[i, 1], points[j, 1], np.nan])      
-            z = np.append(z, [points[i, 2], points[j, 2], np.nan])
-        ax.plot3D(x, y, z, color='g', lw='0.1')
-
-    fig = plt.figure()
-    ax = plt.axes(projection='3d')
-
-    plot_tri_2(ax, xyz, tri)
-
-    # for tr in tri.simplices:
-    #     pts = xyz[tr, :]
-    #     ax.plot3D(pts[[0, 1], 0], pts[[0, 1], 1], pts[[0, 1], 2], color='g', lw='0.1')
-    #     ax.plot3D(pts[[0, 2], 0], pts[[0, 2], 1], pts[[0, 2], 2], color='g', lw='0.1')
-    #     ax.plot3D(pts[[0, 3], 0], pts[[0, 3], 1], pts[[0, 3], 2], color='g', lw='0.1')
-    #     ax.plot3D(pts[[1, 2], 0], pts[[1, 2], 1], pts[[1, 2], 2], color='g', lw='0.1')
-    #     ax.plot3D(pts[[1, 3], 0], pts[[1, 3], 1], pts[[1, 3], 2], color='g', lw='0.1')
-    #     ax.plot3D(pts[[2, 3], 0], pts[[2, 3], 1], pts[[2, 3], 2], color='g', lw='0.1')
-
-    ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], color='b')
-
-    ax.set_xlim3d(0, xyz[:, 0].max())
-    ax.set_ylim3d(0, xyz[:, 1].max())
-    ax.set_zlim3d(0, xyz[:, 2].max())
-
-    plt.show()
-
-
 def show_surface_nps(faces, d):
-
-    fig = plt.figure()
+    plt.figure(figsize=(10, 10))
     ax = plt.axes(projection='3d')
 
     # ax.scatter(xyz[:, 0], xyz[:, 1], xyz[:, 2], color='b')
@@ -727,21 +649,15 @@ def main():
     # initialize nanoparticle with diameter's
     nps = spherical(diameter)
 
-    # build sphere
-    #nps.build_sphere_nps()
-
-    # save xyz
-    # nps.save_xyz(nps.sphere_init, name="sphere_init")
-
     # saving files
     # nps.save_forcefield(nps.dfatoms, nps.box_length)
 
-    #print(f"Radius final: {nps.r_final:.3f} nm")
-    #print(f"Diameter final: {nps.r_final * 2:.3f} nm")
-    #print(f"Surface: {nps.surface:.3f} nm2")
-    #print(f"H per nm2: {nps.H_surface:.3f}")
+    print(f"Radius final: {nps.r_final:.3f} nm")
+    print(f"Diameter final: {nps.r_final * 2:.3f} nm")
+    print(f"Surface: {nps.surface:.3f} nm2")
+    print(f"H per nm2: {nps.H_surface:.3f}")
 
-    #show_surface_nps(nps.faces, diameter)
+    show_surface_nps(nps.faces, diameter)
 
     dt = time.time() - t0
     print("Build done in %.0f s" % dt)
