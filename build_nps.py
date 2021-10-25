@@ -146,10 +146,7 @@ def _surface_clean(coord):
 
 
 class spherical(nano.NANO):
-    """
-    Class to represent a specifically spherical nanoparticle
-
-    """
+    """Class to represent a specifically spherical nanoparticle."""
 
     def __init__(self, diameter, file=cell_unit):
         """
@@ -687,7 +684,16 @@ def main():
         dimensions = args['par']
 
         # initialize flat with dimension's
-        surf = plane(dimensions)
+        flat = plane(dimensions)
+
+        # Gen interaction lists
+        flat.get_types_interactions()
+
+        # saving files
+        flat.save_forcefield(flat.dfatoms, flat.box_length, res='nps', surf='flat')
+
+        print(f'Surface: {flat.surface:.3f} nm2')
+        print(f'H per nm2: {flat.H_surface:.3f}')
 
     dt = time.time() - t0
     print('Build done in %.0f s' % dt)

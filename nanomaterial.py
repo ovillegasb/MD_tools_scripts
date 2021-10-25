@@ -151,6 +151,12 @@ class connectivity(nx.DiGraph):
                 if i in self._open_si:
                     self._open_si.remove(i)
 
+        # Update the oxygen connected
+        for i in dfO.loc[self._open_o, :].index:
+            if self.nodes[i]['atsb'] == 'O' and self.nbonds(i) == 2:
+                if i in self._open_o:
+                    self._open_o.remove(i)
+
     def nbonds(self, inode):
         """Return number of atoms in connected to iat."""
         return int(self.degree[inode] / 2)
@@ -162,20 +168,22 @@ class connectivity(nx.DiGraph):
 
     def reset_nodes(self):
         """Reset le count of node from 0 to sizes nodes -1"""
-        mapping = {value: count for count, value in enumerate(self.nodes, start=1)}
+        mapping = {value: count for count, value in enumerate(self.nodes, start=0)}
 
         return nx.relabel_nodes(self, mapping, copy=True)
 
     def _pbc(self, box, vec):
         """Transfers the coordinates to the main box."""
         nvec = []
-        for q, qL in zip(vec, box):
+        for q, qL in zip(vec[:-1], box[:-1]):
             if q < 0:
                 nvec.append(q + qL)
             elif q > qL:
                 nvec.append(q - qL)
             else:
                 nvec.append(q)
+
+        nvec.append(vec[-1])
 
         return np.array(nvec, dtype=np.float64)
 
@@ -247,7 +255,7 @@ class connectivity(nx.DiGraph):
                     self._open_o.append(natoms)
                     natoms += 1
 
-    def add_hydrogen(self):
+    def add_hydrogen(self, box, pbc=None):
         """Adding hydrogen to terminal oxygens."""
         natoms = max(list(self.nodes)) + 1
         dHO = 0.945  # angs
@@ -279,6 +287,10 @@ class connectivity(nx.DiGraph):
                 th_hosi = np.arccos(np.dot(oh_u, osi_u))
                 th_hosi *= 180 / np.pi
                 th = np.round(th_hosi, decimals=1)
+
+            # # Using pbc
+            # if pbc:
+            #     h = self._pbc(box, h)
 
             self.add_new_at(natoms, ai, h, 'H')
             natoms += 1
@@ -761,9 +773,9 @@ class NANO:
 
         return coord, dfbonds, dfangles
 
-    def save_forcefield(self, coord, box, res='NPS'):
+    def save_forcefield(self, coord, box, res='NPS', surf='sphere'):
         self.write_gro(coord, box, res)
-        self.write_itp(res)
+        self.write_itp(res, surf)
 
     def write_gro(self, coord, box, res='NPS'):
         """
@@ -777,7 +789,7 @@ class NANO:
         GRO.write('%5d\n' % nat)
         for i in coord.index:
             GRO.write('{:>8}{:>7}{:5d}{:8.3f}{:8.3f}{:8.3f}\n'.format(
-                '1' + res,
+                '1' + res.upper(),
                 coord.loc[i, 'atsb'].upper(),
                 i + 1,
                 coord.loc[i, 'x'] * 0.1,
@@ -792,7 +804,7 @@ class NANO:
         GRO.close()
         print("file %s.gro writed" % res.lower())
 
-    def write_itp(self, res='NPS'):
+    def write_itp(self, res='NPS', surf='sphere'):
         """
         Writing .itp file
 
@@ -814,34 +826,35 @@ class NANO:
         lines += "; Created by Orlando Villegas\n"
         lines += "; mail: orlando.villegas@univ-pau.fr\n"
         lines += ";" + "-" * 60 + "\n"
-        lines += "; RES: {}\n".format(res)
+        lines += "; RES: {}\n".format(res.upper())
         lines += "; Formule: {}\n".format(formule)
         lines += "; Total Charge %.1f\n" % sum([data_atomstype[coord.loc[ch, 'type']][0] for ch in coord.index])
-        lines += f"Radius final: {self.r_final:.3f} nm"
-        lines += f"Diameter final: {self.r_final * 2:.3f} nm"
-        lines += f"Surface: {self.surface:.3f} nm2"
-        lines += f"H per nm2: {self.H_surface:.3f}"
+        if surf == 'sphere':
+            lines += f"; Radius final: {self.r_final:.3f} nm\n"
+            lines += f"; Diameter final: {self.r_final * 2:.3f} nm\n"
+        lines += f"; Surface: {self.surface:.3f} nm2\n"
+        lines += f"; H per nm2: {self.H_surface:.3f}\n"
 
         # atoms types
         lines += "\n[ atomtypes ]\n"
-        lines += "; name   at.num      mass      charge   ptype         c6        c12\n"
-        lines += "SIbulk       14     28.08000       0.000       A     0.0079544       4.063484e-05\n"
-        lines += "Obulk         8     15.99940       0.000       A     0.0015783       2.755408e-06\n"
-        lines += "Osurf         8     15.99940       0.000       A     0.0035659       6.225181e-06\n"
-        lines += "Hsurf         1      1.00800       0.000       A     4.0973980e-07       6.684771e-13\n"
+        lines += "; name   at.num      mass       charge      ptype         sigma      epsilon\n"
+        lines += "SIbulk       14     28.08000       0.000       A     4.150E-1       3.89112E-01\n"
+        lines += "Obulk         8     15.99940       0.000       A     3.470E-1       2.25936E-01\n"
+        lines += "Osurf         8     15.99940       0.000       A     3.470E-1       5.10448E-01\n"
+        lines += "Hsurf         1      1.00800       0.000       A     1.085E-1       6.27600E-02\n"
 
         # pairs types
-        lines += "\n[ pairtypes ]\n"
-        lines += "; i    j    func         cs6          cs12 ; THESE ARE 1-4 INTERACTIONS\n"
-        lines += "Obulk    SIbulk    1    0.0035432       1.058137e-05\n"
-        lines += "Hsurf    Osurf     1    3.8224222e-05       2.039948e-09\n"
-        lines += "Hsurf    Obulk     1    2.5430146e-05       1.357176e-09\n"
-        lines += "Osurf    SIbulk    1    0.0053258       1.590469e-05\n"
+        # lines += "\n[ pairtypes ]\n"
+        # lines += "; i    j    func         cs6          cs12 ; THESE ARE 1-4 INTERACTIONS\n"
+        # lines += "Obulk    SIbulk    1    0.0035432       1.058137e-05\n"
+        # lines += "Hsurf    Osurf     1    3.8224222e-05       2.039948e-09\n"
+        # lines += "Hsurf    Obulk     1    2.5430146e-05       1.357176e-09\n"
+        # lines += "Osurf    SIbulk    1    0.0053258       1.590469e-05\n"
 
         # molecule type
         lines += '\n[ moleculetype ]\n'
         lines += '; name  nrexcl\n'
-        lines += '{}     3\n'.format(res)
+        lines += '{}     3\n'.format(res.upper())
 
         # atoms definition
         lines += '\n[ atoms ]\n'
@@ -852,7 +865,7 @@ class NANO:
                 n + 1,
                 coord.loc[n, 'type'],
                 1,  # n,
-                res,
+                res.upper(),
                 coord.loc[n, 'atsb'].upper(),
                 n + 1,
                 data_atomstype[coord.loc[n, 'type']][0],

@@ -112,3 +112,6 @@ venv.bak/
 *.xyz
 *.gro
 *.itp
+
+# Some images formats
+*.tga
