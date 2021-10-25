@@ -38,7 +38,7 @@ def build_flat_surface(dimensions, file=cell_unit):
     #      Complete the surface on sphere initial.
     #      Add hydrogen and oxygen atoms.
     # flat_final, connectivity = _surface_clean(flat_init)
-    _surface_clean(flat_init)
+    _surface_clean(flat_init, box_length)
 
 
 def _expand_cell(dimensions, cell):
@@ -87,7 +87,7 @@ def _expand_cell(dimensions, cell):
     return coord, box
 
 
-def _surface_clean(coord):
+def _surface_clean(coord, box):
     """The surface of the nanoparticle is completed with O, H.
     Search connectivity."""
 
@@ -98,11 +98,13 @@ def _surface_clean(coord):
     # remove not connected atoms
     connect = nano.connectivity()
     connect.get_connectivity(coord)
-    print(len(connect.nodes))
-    print(coord)
+    # Uses periodic boundary conditions to search for remaining connectivity
+    connect.periodic_boxes(box, pbc='xy')
+    connect.add_oxygens(box, pbc=True)
+    # connect.add_hydrogen()
 
     ncoord = connect.get_df()
-    nano.save_xyz(ncoord, name='flat_connect')
+    nano.save_xyz(ncoord, name='flat_oxygen')
 
 
 class plane:

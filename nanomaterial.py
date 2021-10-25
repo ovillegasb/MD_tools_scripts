@@ -98,6 +98,59 @@ class connectivity(nx.DiGraph):
             elif self.nodes[i]['atsb'] == 'O' and self.nbonds(i) == 1:
                 self._open_o.append(i)
 
+    def periodic_boxes(self, box, pbc='xy'):
+        """Generate the box periodics from pbc."""
+        components = []
+        components[:0] = pbc
+
+        coord = self.get_df()
+
+        # Separate coordinates from Si and O
+        dfSI = coord[coord['atsb'] == 'Si']
+        dfO = coord[coord['atsb'] == 'O']
+
+        AB = box[:-1]
+        # print(f'Plane dimensions AxB: {AB}')
+        """
+        boxs :
+
+               | _x+y|
+        | -x_y | _x_y| +x_y |
+               | _x-y|
+
+        4 box news
+        """
+        boxs = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        for (i, j) in boxs:
+            # translating coordinates to the quadrant (i, j)
+            dfOn = pd.DataFrame(dfO, copy=True)
+            dfOn.loc[:, components] += np.array([i, j]) * AB
+
+            # compute distance matric SI vs O (for differents periodics boxs)
+            xyzSI = dfSI.loc[:, ['x', 'y', 'z']].values.astype(np.float)
+            xyzO = dfOn.loc[:, ['x', 'y', 'z']].values.astype(np.float)
+
+            m = cdist(xyzSI, xyzO, 'euclidean')
+
+            # search connectivity
+            for si in range(len(m)):
+                # Index where is O between 0.0 to 1.8 ang
+                ndxO = dfOn.iloc[np.where((m[si, :] > 0.0) & (m[si, :] <= 1.8))[0], :].index
+                ndxSI = dfSI.iloc[[si], :].index
+
+                if len(ndxO) > 0:
+                    self.add_edge(ndxSI[0], ndxO[0])
+                    self.add_edge(ndxO[0], ndxSI[0])
+                else:
+                    continue
+
+        # Update the silicon connected
+        for i in dfSI.loc[self._open_si, :].index:
+            if self.nodes[i]['atsb'] == 'Si' and self.nbonds(i) == 4:
+                if i in self._open_si:
+                    self._open_si.remove(i)
+
     def nbonds(self, inode):
         """Return number of atoms in connected to iat."""
         return int(self.degree[inode] / 2)
@@ -113,7 +166,20 @@ class connectivity(nx.DiGraph):
 
         return nx.relabel_nodes(self, mapping, copy=True)
 
-    def add_oxygens(self):
+    def _pbc(self, box, vec):
+        """Transfers the coordinates to the main box."""
+        nvec = []
+        for q, qL in zip(vec, box):
+            if q < 0:
+                nvec.append(q + qL)
+            elif q > qL:
+                nvec.append(q - qL)
+            else:
+                nvec.append(q)
+
+        return np.array(nvec, dtype=np.float64)
+
+    def add_oxygens(self, box, pbc=None):
         """Adding news oxygens to silice with 1 < nb < 4."""
         natoms = len(self.nodes)
         for ai in self._open_si:
@@ -126,6 +192,9 @@ class connectivity(nx.DiGraph):
                 ox2 = np.array(self.nodes[oxygens[1]]['xyz'], dtype=np.float64)
                 ox3 = np.array(self.nodes[oxygens[2]]['xyz'], dtype=np.float64)
                 new_ox = (si - ox1) + (si - ox2) + (si - ox3) + si
+                # Using pbc
+                if pbc:
+                    new_ox = self._pbc(box, new_ox)
                 # adding new atom O
                 if len(self._id_removed) > 0:
                     self.add_new_at(self._id_removed[0], ai, new_ox, 'O')
@@ -151,6 +220,11 @@ class connectivity(nx.DiGraph):
                 vnew = np.cross(MA, MP)
                 new_ox1 = N + vnew / LA.norm(MP)
                 new_ox2 = N - vnew / LA.norm(MP)
+                # Using pbc
+                if pbc:
+                    new_ox1 = self._pbc(box, new_ox1)
+                    new_ox2 = self._pbc(box, new_ox2)
+
                 # adding new atom O1
                 if len(self._id_removed) > 0:
                     self.add_new_at(self._id_removed[0], ai, new_ox1, 'O')
