@@ -23,6 +23,7 @@ from scipy.spatial import ConvexHull
 import mpl_toolkits.mplot3d as a3
 import matplotlib as mpl
 import networkx as nx
+from plane import plane
 
 
 # dat location
@@ -610,22 +611,44 @@ def options():
     """Generate command line interface."""
 
     parser = argparse.ArgumentParser(
-        prog="BUILDER NANO TOPOLOGY",
+        prog='BUILDER NANO TOPOLOGY',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        usage="%(prog)s [-d] diameter",
-        epilog="Enjoy the program!",
+        usage='%(prog)s [-d] diameter',
+        epilog='Enjoy the program!',
         description=__doc__
     )
 
     # Add the arguments
-    # File
-    parser.add_argument("-d", "--diameter",
-                        help="Nanoparticle diameter in nanometers",
+
+    # Surface type
+    parser.add_argument('-surf', '--surface',
+                        help='spherical or planar',
+                        default='spherical',
+                        metavar='SURFACE',
+                        type=str,
+                        choices=['spherical', 'planar'])
+
+    sphere = parser.add_argument_group('Sphere parameters')
+
+    # Diameters
+    sphere.add_argument('-d', '--diameter',
+                        help='Nanoparticle diameter in nanometers',
                         default=2.0,
-                        metavar="angstroms",
+                        metavar='angstroms',
                         type=np.float64)
 
-    return vars(parser.parse_args())
+    plane = parser.add_argument_group('Plane parameters')
+    # Plane parameters
+    plane.add_argument('-p', '--par',
+                       help='AxBxC where A, B, C dimensions of the desired plane in nanometers',
+                       default='',
+                       type=str)
+
+    args = vars(parser.parse_args())
+    if args['surface'] == 'planar':
+        assert args['par'] != '', parser.error('--surface \"planar\" require --par')
+
+    return args
 
 
 def main():
@@ -634,32 +657,40 @@ def main():
     # starting
     args = options()
 
-    # in nanometers
-    diameter = args['diameter']
-    print(f"Diameter initial {diameter} nm")
+    if args['surface'] == 'spherical':
+        # in nanometers
+        diameter = args['diameter']
+        print(f'Diameter initial {diameter} nm')
 
-    # initialize nanoparticle with diameter's
-    nps = spherical(diameter)
+        # initialize nanoparticle with diameter's
+        nps = spherical(diameter)
 
-    # Fitting surface
-    nps.fixing_surface(Hsurface=5.0)
+        # Fitting surface
+        nps.fixing_surface(Hsurface=5.0)
 
-    # Gen interaction lists
-    nps.get_types_interactions()
+        # Gen interaction lists
+        nps.get_types_interactions()
 
-    # saving files
-    nps.save_forcefield(nps.dfatoms, nps.box_length)
+        # saving files
+        nps.save_forcefield(nps.dfatoms, nps.box_length)
 
-    print(f"Radius final: {nps.r_final:.3f} nm")
-    print(f"Diameter final: {nps.r_final * 2:.3f} nm")
-    print(f"Surface: {nps.surface:.3f} nm2")
-    print(f"H per nm2: {nps.H_surface:.3f}")
+        print(f'Radius final: {nps.r_final:.3f} nm')
+        print(f'Diameter final: {nps.r_final * 2:.3f} nm')
+        print(f'Surface: {nps.surface:.3f} nm2')
+        print(f'H per nm2: {nps.H_surface:.3f}')
 
-    # Show surface H
-    show_surface_nps(nps.dfatoms, nps.faces, diameter)
+        # Show surface H
+        # show_surface_nps(nps.dfatoms, nps.faces, diameter)
+
+    elif args['surface'] == 'planar':
+        # in nanometers
+        dimensions = args['par']
+
+        # initialize flat with dimension's
+        surf = plane(dimensions)
 
     dt = time.time() - t0
-    print("Build done in %.0f s" % dt)
+    print('Build done in %.0f s' % dt)
 
 
 if __name__ == '__main__':
