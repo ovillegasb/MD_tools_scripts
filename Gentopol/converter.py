@@ -74,14 +74,12 @@ def convert(**kwargs):
         GenMolRep(mol.split('/')[-1], optim, resname, charge)
         mol = BOSSReader('%s.z' % resname, optim, charge, lbcc)
 
-    """
-    elif pdb != None:
+    elif pdb is not None:
         os.system('cp %s /tmp/' % pdb)
         os.chdir('/tmp/')
         GenMolRep(pdb, optim, resname, charge)
         mol = BOSSReader('%s.z' % resname, optim, charge, lbcc)
         clu = True
-    """
 
     assert (mol.MolData['TotalQ']['Reference-Solute'] ==
             charge), "PROPOSED CHARGE IS NOT POSSIBLE: SOLUTE MAY BE AN OPEN SHELL"
