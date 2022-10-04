@@ -187,7 +187,7 @@ class connectivity(nx.DiGraph):
 
         return np.array(nvec, dtype=np.float64)
 
-    def add_oxygens(self, box, pbc=None):
+    def add_oxygens(self, box=None, pbc=None):
         """Adding news oxygens to silice with 1 < nb < 4."""
         natoms = len(self.nodes)
         for ai in self._open_si:
@@ -255,7 +255,7 @@ class connectivity(nx.DiGraph):
                     self._open_o.append(natoms)
                     natoms += 1
 
-    def add_hydrogen(self, box, pbc=None):
+    def add_hydrogen(self, box=None, pbc=None):
         """Adding hydrogen to terminal oxygens."""
         natoms = max(list(self.nodes)) + 1
         dHO = 0.945  # angs
